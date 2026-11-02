@@ -324,6 +324,10 @@
   .export-btns { display: flex; gap: 8px; }
   .export-btns .btn { flex: 1; }
   .ds-note { font-size: .72rem; color: var(--fg-soft); margin: 2px 0 0; line-height: 1.5; }
+  .storage-status { font-size: .76rem; font-weight: 700; margin: -4px 0 14px; padding: 8px 11px; border-radius: 10px; background: var(--surface-2); color: var(--fg-soft); }
+  .storage-status[data-mode="cloud"] { background: var(--accent-soft); color: var(--accent-ink); }
+  .storage-status[data-mode="slow"] { background: var(--peach-soft); color: var(--peach); }
+  .storage-status:empty { display: none; }
   #importMode label.msel { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
   footer { text-align: center; color: var(--fg-soft); font-size: .72rem; padding: 24px 16px 8px; }
 </style>
@@ -390,7 +394,7 @@
     </section>
   </main>
 
-  <footer>기록은 이 브라우저에 자동 저장돼요 · 💛</footer>
+  <footer>기록은 자동으로 저장돼요 · 💛</footer>
 </div>
 
 <!-- Entry editor sheet -->
@@ -459,6 +463,7 @@
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="dataTitle">
     <h3 id="dataTitle">데이터 관리</h3>
     <div class="sheet-date" id="dataCount"></div>
+    <div class="storage-status" id="storageStatus"></div>
 
     <div class="data-sec">
       <div class="ds-title">📤 내보내기 (백업)</div>
@@ -521,6 +526,107 @@
     try { localStorage.setItem(STORE, JSON.stringify(entries)); } catch (e) {}
   }
   var entries = load();
+
+  // ---- storage mode: cloud (db capability) with local fallback ----
+  var cloudDb = null;      // db namespace once resolved
+  var CLOUD = false;       // true while cloud store is active
+  var migrationDone = false;
+
+  function rerenderAll() {
+    renderCalendar();
+    if (!$("#tab-history").hidden) renderHistory();
+    if (!$("#tab-stats").hidden) renderStats();
+  }
+  function stripEntry(e) {
+    return {
+      date: e.date, name: e.name,
+      amount: (e.amount == null ? "" : e.amount),
+      unit: (e.unit == null ? "" : e.unit),
+      react: e.react || "none",
+      memo: e.memo || "",
+      ts: (typeof e.ts === "number" ? e.ts : Date.now())
+    };
+  }
+  function showCloudStatus(mode) {
+    var el = document.getElementById("storageStatus"); if (!el) return;
+    var map = {
+      connecting: "☁️ 클라우드 연결 중…",
+      cloud: "☁️ 클라우드에 저장됨 · 기기 간 동기화",
+      local: "💾 이 브라우저에 저장됨",
+      slow: "⚠️ 클라우드 연결이 느려요"
+    };
+    el.textContent = map[mode] || "";
+    el.dataset.mode = mode;
+  }
+
+  function cloudSet(e) { try { cloudDb.collection("entries").doc(e.id).set(stripEntry(e)).catch(function () {}); } catch (x) {} }
+  function cloudDel(id) { try { cloudDb.collection("entries").doc(id).delete().catch(function () {}); } catch (x) {} }
+
+  function upsertEntry(e) {
+    var i = entries.findIndex(function (x) { return x.id === e.id; });
+    if (i >= 0) entries[i] = e; else entries.push(e);
+    if (CLOUD && cloudDb) cloudSet(e); else save();
+    rerenderAll();
+  }
+  function deleteEntryById(id) {
+    entries = entries.filter(function (x) { return x.id !== id; });
+    if (CLOUD && cloudDb) cloudDel(id); else save();
+    rerenderAll();
+  }
+  function bulkAddEntries(arr) {
+    arr.forEach(function (e) { entries.push(e); });
+    if (CLOUD && cloudDb) arr.forEach(cloudSet); else save();
+    rerenderAll();
+  }
+  function replaceAllEntries(arr) {
+    if (CLOUD && cloudDb) {
+      var newIds = {}; arr.forEach(function (e) { newIds[e.id] = 1; });
+      entries.forEach(function (e) { if (!newIds[e.id]) cloudDel(e.id); });
+      arr.forEach(cloudSet);
+    }
+    entries = arr.slice();
+    if (!(CLOUD && cloudDb)) save();
+    rerenderAll();
+  }
+
+  function migrateLocalToCloud() {
+    var local = load();
+    if (!local.length) return;
+    local.forEach(function (e) { if (e && e.id) cloudSet(e); });
+    toast("기존 기록을 클라우드로 옮겨어요 ☁️");
+  }
+  function initCloud() {
+    showCloudStatus("connecting");
+    var slow = setTimeout(function () { if (!CLOUD) showCloudStatus("slow"); }, 10000);
+    window.claude.use("db").then(function (db) {
+      if (!db) { clearTimeout(slow); showCloudStatus("local"); maybeSeed(); rerenderAll(); return; }
+      cloudDb = db;
+      cloudDb.collection("entries").onSnapshot(function (snap) {
+        clearTimeout(slow);
+        CLOUD = true;
+        var arr = [];
+        snap.docs.forEach(function (d) {
+          var v = d.data() || {};
+          arr.push({ id: d.id, date: v.date, name: v.name,
+            amount: (v.amount == null ? "" : v.amount), unit: (v.unit == null ? "" : v.unit),
+            react: v.react || "none", memo: v.memo || "", ts: (typeof v.ts === "number" ? v.ts : 0) });
+        });
+        arr.sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); });
+        entries = arr;
+        showCloudStatus("cloud");
+        if (!snap.metadata.fromCache && !migrationDone) {
+          migrationDone = true;
+          if (snap.empty) migrateLocalToCloud();
+        }
+        rerenderAll();
+      }, function () {
+        clearTimeout(slow);
+        CLOUD = false; cloudDb = null;
+        showCloudStatus("local");
+        entries = load(); rerenderAll();
+      });
+    }, function () { clearTimeout(slow); showCloudStatus("local"); maybeSeed(); rerenderAll(); });
+  }
 
   // ---- helpers ----
   function $(s, r) { return (r || document).querySelector(s); }
@@ -688,9 +794,7 @@
         var id = b.closest(".entry").dataset.id;
         var e = entries.find(function (x) { return x.id === id; });
         confirmDialog("‘" + (e ? e.name : "") + "’ 기록을 삭제할까요?", function () {
-          entries = entries.filter(function (x) { return x.id !== id; });
-          save(); toast("삭제했어요");
-          renderCalendar(); if (!$("#tab-history").hidden) renderHistory(); if (!$("#tab-stats").hidden) renderStats();
+          deleteEntryById(id); toast("삭제했어요");
         });
       });
     });
@@ -935,20 +1039,17 @@
       memo: $("#fMemo").value.trim(),
       date: $("#fDate").value
     };
+    var entry;
     if (id) {
-      var idx = entries.findIndex(function (x) { return x.id === id; });
-      if (idx >= 0) { entries[idx] = Object.assign(entries[idx], data); }
+      var existing = entries.find(function (x) { return x.id === id; }) || {};
+      entry = Object.assign({}, existing, data, { id: id });
       toast("수정했어요");
     } else {
-      data.id = uid(); data.ts = Date.now();
-      entries.push(data);
+      entry = Object.assign({}, data, { id: uid(), ts: Date.now() });
       toast("기록했어요 🍼");
     }
-    save();
+    upsertEntry(entry);
     closeSheet();
-    renderCalendar();
-    if (!$("#tab-history").hidden) renderHistory();
-    if (!$("#tab-stats").hidden) renderStats();
   });
   $("#sheetCancel").addEventListener("click", closeSheet);
   overlay.addEventListener("click", function (e) { if (e.target === overlay) closeSheet(); });
@@ -992,12 +1093,8 @@
     confirmDialog(
       "⚠️ 정말 모든 기록(" + entries.length + "개)을 삭제할까요?\n이 작업은 되돌릴 수 없어요.\n필요하면 먼저 ‘내보내기’로 백업하세요.",
       function () {
-        entries = [];
-        save();
+        replaceAllEntries([]);
         closeData();
-        renderCalendar();
-        if (!$("#tab-history").hidden) renderHistory();
-        if (!$("#tab-stats").hidden) renderStats();
         toast("전체 기록을 삭제했어요");
       }, "삭제", true);
   });
@@ -1097,19 +1194,15 @@
       : clean.length + "개 기록을 현재 데이터에 추가할까요?";
     confirmDialog(msg, function () {
       if (replace) {
-        entries = clean;
+        replaceAllEntries(clean);
         toast("교체했어요 ✅");
       } else {
         var have = {}; entries.forEach(function (e) { have[e.id] = 1; });
-        var added = 0;
-        clean.forEach(function (e) { if (!have[e.id]) { entries.push(e); have[e.id] = 1; added++; } });
-        toast(added + "개 가져왔어요 ✅");
+        var toAdd = clean.filter(function (e) { return !have[e.id]; });
+        bulkAddEntries(toAdd);
+        toast(toAdd.length + "개 가져왔어요 ✅");
       }
-      save();
       closeData();
-      renderCalendar();
-      if (!$("#tab-history").hidden) renderHistory();
-      if (!$("#tab-stats").hidden) renderStats();
     }, replace ? "교체" : "추가", replace);
   });
 
@@ -1133,8 +1226,13 @@
 
   // ---- init ----
   initTheme();
-  maybeSeed();
-  renderCalendar();
+  if (window.claude && window.claude.use) {
+    renderCalendar();
+    initCloud();
+  } else {
+    maybeSeed();
+    renderCalendar();
+  }
 })();
 </script>
 

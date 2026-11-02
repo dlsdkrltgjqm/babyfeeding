@@ -297,7 +297,7 @@
   /* Confirm dialog */
   .confirm-box { background: var(--surface); border-radius: var(--radius); max-width: 320px; width: calc(100% - 40px); padding: 20px; text-align: center; box-shadow: var(--shadow-lg); align-self: center; transform: scale(.9); transition: transform .2s; }
   .overlay.open .confirm-box { transform: scale(1); }
-  .confirm-box p { margin: 0 0 16px; font-size: .95rem; }
+  .confirm-box p { margin: 0 0 16px; font-size: .95rem; white-space: pre-line; }
   .confirm-box .row { display: flex; gap: 10px; }
   .confirm-box .row .btn { flex: 1; }
   .btn.danger { background: var(--danger); }
@@ -491,6 +491,8 @@
       <button type="button" class="btn block" id="importBtn">가져오기</button>
     </div>
 
+    <div class="data-divider"></div>
+    <button type="button" class="btn danger block" id="clearAllBtn">🗑️ 전체 데이터 삭제</button>
     <div class="sheet-actions">
       <button type="button" class="btn ghost" id="dataClose">닫기</button>
     </div>
@@ -984,6 +986,20 @@
   function closeData() { dataOverlay.classList.remove("open"); }
   $("#dataBtn").addEventListener("click", openData);
   $("#dataClose").addEventListener("click", closeData);
+  $("#clearAllBtn").addEventListener("click", function () {
+    if (!entries.length) { toast("삭제할 기록이 없어요"); return; }
+    confirmDialog(
+      "⚠️ 정말 모든 기록(" + entries.length + "개)을 삭제할까요?\n이 작업은 되돌릴 수 없어요.\n필요하면 먼저 ‘내보내기’로 백업하세요.",
+      function () {
+        entries = [];
+        save();
+        closeData();
+        renderCalendar();
+        if (!$("#tab-history").hidden) renderHistory();
+        if (!$("#tab-stats").hidden) renderStats();
+        toast("전체 기록을 삭제했어요");
+      }, "삭제", true);
+  });
   dataOverlay.addEventListener("click", function (e) { if (e.target === dataOverlay) closeData(); });
 
   function copyText(txt, okMsg) {

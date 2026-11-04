@@ -6,9 +6,16 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
+<meta name="theme-color" content="#7ba86a">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="이유식">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon-32.png">
 <title>이유식 기록장</title>
 <style>
-  /* base reset the artifact host normally injects */
   :root { color-scheme: light; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); }
   html, body { margin: 0; }
   body { font: 14px system-ui, -apple-system, sans-serif; }
@@ -330,6 +337,43 @@
   .storage-status:empty { display: none; }
   #importMode label.msel { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
   footer { text-align: center; color: var(--fg-soft); font-size: .72rem; padding: 24px 16px 8px; }
+
+  /* 식단표 (meal plan) tab */
+  .plan { padding: 6px 0 10px; }
+  .plan-head { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--accent-ink); margin: 10px 0 2px; }
+  .plan-sub { font-size: .76rem; color: var(--fg-soft); margin-bottom: 10px; }
+  .plan-sec { font-size: 1.04rem; font-weight: 700; color: var(--accent-ink); margin: 22px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .plan-sec:first-of-type { border-top: none; padding-top: 4px; }
+  .plan p { font-size: .88rem; color: var(--fg); margin: 8px 0; line-height: 1.65; }
+  .plan-list { margin: 8px 0; padding-left: 18px; }
+  .plan-list li { font-size: .88rem; margin: 5px 0; line-height: 1.55; }
+  .plan-table { overflow-x: auto; margin: 10px 0 4px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); -webkit-overflow-scrolling: touch; }
+  .plan-table table { border-collapse: collapse; width: 100%; font-size: .82rem; min-width: 340px; }
+  .plan-table th, .plan-table td { border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; line-height: 1.5; }
+  .plan-table th { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; white-space: nowrap; }
+  .plan-table tbody tr:last-child td { border-bottom: none; }
+  .plan-table th:last-child, .plan-table td:last-child { border-right: none; }
+  .plan-table td:first-child { white-space: nowrap; font-weight: 600; color: var(--fg-soft); }
+  .plan-table tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+  /* 식단표 -> 기록 담기 버튼 */
+  .plan-add { border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; font-size: .76rem; padding: 5px 10px; border-radius: 999px; white-space: nowrap; cursor: pointer; }
+  .plan-add:active { background: var(--accent); color: #fff; }
+  .plan-table td.plan-add-cell { text-align: center; }
+  .plan-table th.plan-add-h { white-space: nowrap; }
+  /* 식단표 시작일 선택 */
+  .plan-start { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 10px 12px; margin: 6px 0 14px; font-size: .85rem; font-weight: 700; color: var(--accent-ink); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .plan-start input[type="date"] { font-family: inherit; font-size: .9rem; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); }
+  .plan-start-note { flex-basis: 100%; font-size: .74rem; font-weight: 500; color: var(--fg-soft); }
+  /* 식단표 날짜 선택 다이얼로그 */
+  #planAddOverlay { z-index: 72; }
+  .plan-add-date { margin: 2px 0 16px; text-align: left; }
+  .plan-add-date label { display: block; font-size: .76rem; font-weight: 700; color: var(--fg-soft); margin-bottom: 5px; }
+  .plan-add-date input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--fg); font-family: inherit; font-size: 1rem; }
+  /* 식단표 담기 버튼: 오전/오후 분리 + 담김 표시 */
+  .plan-add-cell { text-align: center; white-space: nowrap; }
+  .plan-add-cell .plan-add { display: block; margin: 0 auto; }
+  .plan-add-cell .plan-add + .plan-add { margin-top: 5px; }
+  .plan-add.added { background: var(--surface-2); color: var(--accent-ink); border-color: var(--line); opacity: .9; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -354,6 +398,7 @@
     <button role="tab" data-tab="calendar" aria-selected="true"><span class="ic">📅</span>캘린더</button>
     <button role="tab" data-tab="history" aria-selected="false"><span class="ic">📖</span>내역</button>
     <button role="tab" data-tab="stats" aria-selected="false"><span class="ic">📊</span>통계</button>
+    <button role="tab" data-tab="plan" aria-selected="false"><span class="ic">📋</span>식단표</button>
   </nav>
 
   <main>
@@ -391,6 +436,63 @@
       <div class="stat-tiles" id="statTiles"></div>
       <div class="sec-title" style="font-size:1rem;margin-top:4px">🥗 영양소별 사용 재료</div>
       <div class="rank" id="statRank"></div>
+    </section>
+    <!-- MEAL PLAN -->
+    <section id="tab-plan" hidden>
+      <div class="plan">
+<div class="plan-head">🍼 초기·중기 이유식 식단표</div>
+<h3 class="plan-sec">진행 원칙</h3>
+<p>생후 181일에 시작해 5주 동안 하루 1회 초기 이유식을 진행하는 계획이에요. 알레르기 식품은 병원이 여는 평일 오전에만 처음 먹이도록 배치했어요.</p>
+<div class="plan-table"><table><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody><tr><td>시간</td><td>오전 수유 한 번(예: 10시)에 이유식 먼저, 바로 이어서 분유</td></tr><tr><td>일반 재료</td><td>새 재료는 1~2일 먹여 보고 다음으로</td></tr><tr><td>알레르기 식품</td><td>2일 연속 먹이고, 다음 알레르기 식품까지 최소 3일 간격</td></tr><tr><td>새 재료 개수</td><td>하루에 새 재료는 한 가지만. 통과한 재료끼리는 자유롭게 섞기</td></tr><tr><td>농도</td><td>1~2주차 10배죽(쌀:물 1:10) → 3주차부터 8배죽</td></tr><tr><td>양(1회)</td><td>1주차 1~2숟가락(약 10~30g) → 2주차 30~50g → 3주차 50~60g → 4~5주차 60~80g</td></tr><tr><td>분유</td><td>하루 4회 패턴과 총량(약 700~900ml) 거의 그대로 유지</td></tr><tr><td>간</td><td>소금, 설탕, 간장 없이</td></tr></tbody></table></div>
+<p>표의 ★는 새 일반 재료, ◆는 새 알레르기 식품이에요. 양은 아기가 먹는 만큼 조절하면 돼요.</p>
+<p>재료 g은 1회분, 익히기 전 무게 기준이에요. 쌀은 불린 쌀 무게이고, 물은 배죽에 맞춰 넣어요(10배죽이면 쌀 10g에 물 100ml). 매번 만들기 번거로우면 2~3회분을 한 번에 만들어 냉장·냉동해 두세요.</p>
+<h3 class="plan-sec">1주차 · 기본 재료 익히기</h3>
+<p>쌀과 소고기로 바탕을 만드는 주예요. 알레르기 식품은 아직 넣지 않아요.</p>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>재료 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>12/7 (월)</td><td>쌀 10g</td><td>★쌀</td><td>1~2숟가락만</td></tr><tr><td>12/8 (화)</td><td>쌀 10g</td><td></td><td></td></tr><tr><td>12/9 (수)</td><td>쌀 10g + 소고기 5g</td><td>★소고기</td><td>안심·우둔, 기름 제거</td></tr><tr><td>12/10 (목)</td><td>쌀 10g + 소고기 5g</td><td></td><td></td></tr><tr><td>12/11 (금)</td><td>쌀 10g + 소고기 5g + 애호박 5g</td><td>★애호박</td><td></td></tr><tr><td>12/12 (토)</td><td>쌀 10g + 소고기 5g + 애호박 5g</td><td></td><td></td></tr><tr><td>12/13 (일)</td><td>쌀 10g + 소고기 5g + 감자 5g</td><td>★감자</td><td></td></tr></tbody></table></div>
+<h3 class="plan-sec">2주차 · 달걀 시작</h3>
+<p>달걀을 노른자와 흰자로 나눠 하나씩 확인해요. 달걀은 항상 완숙으로 익혀서 주세요.</p>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>재료 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>12/14 (월)</td><td>쌀 15g + 소고기 10g + 애호박 10g + 노른자 1g</td><td>◆달걀 노른자</td><td>노른자 1g = 약 1/4작은술</td></tr><tr><td>12/15 (화)</td><td>쌀 15g + 소고기 10g + 감자 10g + 노른자 3g</td><td></td><td>약 1/2작은술</td></tr><tr><td>12/16 (수)</td><td>쌀 15g + 소고기 10g + 단호박 10g</td><td>★단호박</td><td></td></tr><tr><td>12/17 (목)</td><td>쌀 15g + 소고기 10g + 애호박 10g + 흰자 1g</td><td>◆달걀 흰자</td><td>흰자 1g = 약 1/4작은술</td></tr><tr><td>12/18 (금)</td><td>쌀 15g + 소고기 10g + 단호박 10g + 흰자 3g</td><td></td><td>약 1/2작은술</td></tr><tr><td>12/19 (토)</td><td>쌀 15g + 소고기 10g + 브로콜리 10g</td><td>★브로콜리</td><td>꽃 부분만</td></tr><tr><td>12/20 (일)</td><td>쌀 15g + 소고기 10g + 고구마 10g</td><td>★고구마</td><td></td></tr></tbody></table></div>
+<p>달걀을 통과하면 이후에도 주 2~3회, 완숙 달걀 5~10g씩 미음에 섞어 계속 먹여 주세요.</p>
+<h3 class="plan-sec">3주차 · 밀, 8배죽으로</h3>
+<p>이번 주부터 8배죽으로 조금 되게 만들어요.</p>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>재료 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>12/21 (월)</td><td>쌀 15g + 소고기 10g + 애호박 10g + 밀국수 2g</td><td>◆밀</td><td>아기용 밀국수를 푸열게 삶아 갈기</td></tr><tr><td>12/22 (화)</td><td>쌀 15g + 소고기 10g + 고구마 10g + 밀국수 5g</td><td></td><td></td></tr><tr><td>12/23 (수)</td><td>쌀 15g + 소고기 10g + 양배추 10g</td><td>★양배추</td><td></td></tr><tr><td>12/24 (목)</td><td>쌀 15g + 소고기 10g + 청경채 10g</td><td>★청경채</td><td>잎 부분만</td></tr><tr><td>12/25 (금, 성탄절)</td><td>쌀 15g + 소고기 10g + 브로콜리 5g + 단호박 5g + 달걀 5g</td><td></td><td>새 재료 없음</td></tr><tr><td>12/26 (토)</td><td>쌀 15g + 소고기 10g + 감자 10g + 사과 10g</td><td>★사과</td><td>익혀서 갈기</td></tr><tr><td>12/27 (일)</td><td>쌀 15g + 소고기 10g + 오이 10g</td><td>★오이</td><td>껍질·씨 제거</td></tr></tbody></table></div>
+<h3 class="plan-sec">4주차 · 두부(콩)</h3>
+<p>콩 알레르기를 두부로 확인해요.</p>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>재료 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>12/28 (월)</td><td>쌀 20g + 소고기 15g + 애호박 15g + 두부 3g</td><td>◆두부</td><td>데쳐서 으깨기</td></tr><tr><td>12/29 (화)</td><td>쌀 20g + 소고기 15g + 양배추 15g + 두부 10g</td><td></td><td></td></tr><tr><td>12/30 (수)</td><td>쌀 20g + 소고기 15g + 비타민 15g + 달걀 10g</td><td>★비타민</td><td>잎 부분만</td></tr><tr><td>12/31 (목)</td><td>쌀 20g + 소고기 15g + 고구마 15g + 배 15g</td><td>★배</td><td>익혀서 갈기</td></tr><tr><td>1/1 (금, 신정)</td><td>쌀 20g + 소고기 15g + 청경채 15g + 밀국수 10g</td><td></td><td>새 재료 없음</td></tr><tr><td>1/2 (토)</td><td>쌀 20g + 소고기 15g + 단호박 15g + 바나나 15g</td><td>★바나나</td><td>으깨서</td></tr><tr><td>1/3 (일)</td><td>쌀 20g + 소고기 15g + 무 15g + 달걀 10g</td><td>★무</td><td></td></tr></tbody></table></div>
+<h3 class="plan-sec">5주차 · 생선, 요거트</h3>
+<p>흰살생선과 유제품을 확인하고 초기를 마무리해요.</p>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>재료 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>1/4 (월)</td><td>쌀 20g + 소고기 15g + 애호박 15g + 대구살 3g</td><td>◆흰살생선(대구)</td><td>쪼서 가시 꼼꼼히 제거</td></tr><tr><td>1/5 (화)</td><td>쌀 20g + 대구살 15g + 감자 15g</td><td></td><td>소고기 대신 대구살</td></tr><tr><td>1/6 (수)</td><td>쌀 15g + 오트밀 5g + 소고기 15g + 브로콜리 15g</td><td>★오트밀</td><td></td></tr><tr><td>1/7 (목)</td><td>쌀 20g + 소고기 15g + 애호박 15g, 간식 요거트 5g</td><td>◆요거트</td><td>무가당 플레인, 5g = 약 1작은술</td></tr><tr><td>1/8 (금)</td><td>쌀 20g + 소고기 15g + 고구마 15g + 요거트 15g</td><td></td><td></td></tr><tr><td>1/9 (토)</td><td>쌀 20g + 닭고기 15g + 양배추 15g</td><td>★닭고기</td><td>안심 부위</td></tr><tr><td>1/10 (일)</td><td>쌀 20g + 소고기 15g + 청경채 15g + 두부 10g</td><td></td><td>새 재료 없음</td></tr></tbody></table></div>
+<p>이후에는 하루 2회로 늘리는 중기 이유식으로 넘어갈 수 있어요. 아기 반응을 보며 1~2주 늦춰도 괜찮아요.</p>
+<h3 class="plan-sec">중기 진행 원칙</h3>
+<p>생후 216일부터 하루 2회로 늘리고, 만 9개월 무렵 후기로 넘어가는 계획이에요. 새 재료와 알레르기 식품은 항상 오전 끼에만 넣고, 오후 끼는 통과한 재료로만 만들어요.</p>
+<div class="plan-table"><table><thead><tr><th>항목</th><th>내용</th></tr></thead><tbody><tr><td>시간</td><td>오전 수유(예: 10시)와 오후 수유(2시나 6시)에 이유식 먼저, 이어서 분유</td></tr><tr><td>오후 끼 시작</td><td>첫 2~3일은 오전 양의 절반으로 시작해 점점 같게</td></tr><tr><td>농도</td><td>6~7주차 7배죽 → 8~9주차 6배죽 → 10주차부터 5배죽. 입자 2~3mm, 혀로 으깰 정도</td></tr><tr><td>재료(1회)</td><td>6~7주차 쌀 20g·고기 15g·채소 20g → 8~9주차 쌀 25g·고기 15g·채소 25g → 10주차부터 쌀 25g·고기 20g·채소 30g</td></tr><tr><td>완성량(1회)</td><td>7개월 70~100g → 8개월 100~120g</td></tr><tr><td>분유</td><td>하루 3~4회, 총 약 600~800ml</td></tr><tr><td>소고기</td><td>철분을 위해 하루 한 끼 이상 계속</td></tr><tr><td>알레르기 식품 유지</td><td>통과한 식품은 오후 끼에 돌려가며 각각 주 2~3회</td></tr></tbody></table></div>
+<p>땅콩, 참깨, 호두, 잣은 반드시 곱게 갈거나 페이스트로만 써요. 땅콩버터는 설탕·소금 없는 100% 제품을 따뜻한 물에 개어 넣어요.</p>
+<h3 class="plan-sec">6주차 · 하루 2회 시작, 땅콩</h3>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>1/11 (월)</td><td>쌀 20g + 소고기 15g + 애호박 10g + 브로콜리 10g</td><td>쌀 10g + 닭고기 10g + 단호박 10g</td><td></td><td>오후 끼 첫날, 절반 양</td></tr><tr><td>1/12 (화)</td><td>쌀 20g + 소고기 15g + 감자 10g + 양배추 10g</td><td>쌀 10g + 대구살 10g + 청경채 10g</td><td></td><td></td></tr><tr><td>1/13 (수)</td><td>쌀 20g + 소고기 15g + 양파 10g + 애호박 10g</td><td>쌀 15g + 두부 10g + 고구마 15g</td><td>★양파</td><td></td></tr><tr><td>1/14 (목)</td><td>쌀 20g + 소고기 15g + 브로콜리 20g + 땅콩버터 1g</td><td>쌀 15g + 닭고기 15g + 단호박 15g</td><td>◆땅콩</td><td>1g = 약 1/4작은술</td></tr><tr><td>1/15 (금)</td><td>쌀 20g + 소고기 15g + 양배추 20g + 땅콩버터 3g</td><td>쌀 15g + 대구살 15g + 감자 15g</td><td></td><td></td></tr><tr><td>1/16 (토)</td><td>쌀 20g + 소고기 15g + 당근 10g + 애호박 10g</td><td>쌀 20g + 두부 15g + 청경채 20g</td><td>★당근</td><td></td></tr><tr><td>1/17 (일)</td><td>쌀 20g + 소고기 15g + 시금치 10g + 감자 10g</td><td>쌀 20g + 닭고기 15g + 고구마 20g + 달걀 10g</td><td>★시금치</td><td>잎만, 데쳐서</td></tr></tbody></table></div>
+<h3 class="plan-sec">7주차 · 새우, 참깨</h3>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>1/18 (월)</td><td>쌀 20g + 소고기 15g + 애호박 20g + 새우살 2g</td><td>쌀 20g + 닭고기 15g + 단호박 20g</td><td>◆새우</td><td>내장 빼고 익혀 다지기</td></tr><tr><td>1/19 (화)</td><td>쌀 20g + 소고기 15g + 양파 10g + 감자 10g + 새우살 5g</td><td>쌀 20g + 대구살 15g + 브로콜리 20g</td><td></td><td></td></tr><tr><td>1/20 (수)</td><td>쌀 20g + 소고기 15g + 파프리카 10g + 양배추 10g</td><td>쌀 20g + 두부 15g + 당근 10g + 애호박 10g + 땅콩버터 3g</td><td>★파프리카</td><td>빨강, 껍질 벗겨서</td></tr><tr><td>1/21 (목)</td><td>쌀 20g + 소고기 15g + 시금치 10g + 감자 10g + 참깨 1g</td><td>쌀 20g + 닭고기 15g + 고구마 20g</td><td>◆참깨</td><td>곱게 간 깨</td></tr><tr><td>1/22 (금)</td><td>쌀 20g + 소고기 15g + 청경채 20g + 참깨 2g</td><td>쌀 20g + 대구살 15g + 단호박 20g + 달걀 10g</td><td></td><td></td></tr><tr><td>1/23 (토)</td><td>쌀 20g + 소고기 15g + 콜리플라워 10g + 양파 10g</td><td>쌀 20g + 두부 15g + 브로콜리 20g + 새우살 5g</td><td>★콜리플라워</td><td></td></tr><tr><td>1/24 (일)</td><td>쌀 20g + 소고기 15g + 표고버섯 10g + 애호박 10g</td><td>쌀 20g + 닭고기 15g + 당근 10g + 감자 10g + 밀국수 10g</td><td>★표고버섯</td><td>기둥 빼고 갓만</td></tr></tbody></table></div>
+<h3 class="plan-sec">8주차 · 돼지고기, 토마토, 6배죽으로</h3>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>1/25 (월)</td><td>쌀 25g + 돼지고기 5g + 애호박 15g + 양파 10g</td><td>쌀 25g + 소고기 15g + 단호박 25g</td><td>◆돼지고기</td><td>안심, 기름 제거</td></tr><tr><td>1/26 (화)</td><td>쌀 25g + 돼지고기 15g + 감자 15g + 양배추 10g</td><td>쌀 25g + 소고기 15g + 브로콜리 25g + 땅콩버터 3g</td><td></td><td></td></tr><tr><td>1/27 (수)</td><td>쌀 20g + 찹쌀 5g + 소고기 15g + 시금치 10g + 당근 15g</td><td>쌀 25g + 대구살 15g + 애호박 25g + 참깨 2g</td><td>★찹쌀</td><td></td></tr><tr><td>1/28 (목)</td><td>쌀 25g + 소고기 15g + 토마토 5g + 양파 10g + 애호박 10g</td><td>쌀 25g + 닭고기 15g + 고구마 25g</td><td>◆토마토</td><td>껍질·씨 빼고 익혀서</td></tr><tr><td>1/29 (금)</td><td>쌀 25g + 소고기 15g + 토마토 15g + 감자 10g</td><td>쌀 25g + 두부 15g + 청경채 25g + 새우살 5g</td><td></td><td></td></tr><tr><td>1/30 (토)</td><td>쌀 25g + 소고기 15g + 콜리플라워 15g + 블루베리 10g</td><td>쌀 25g + 돼지고기 15g + 표고버섯 10g + 애호박 15g</td><td>★블루베리</td><td>으깨서</td></tr><tr><td>1/31 (일)</td><td>쌀 25g + 소고기 15g + 파프리카 10g + 양배추 15g + 김 1g</td><td>쌀 25g + 닭고기 15g + 단호박 25g + 달걀 10g</td><td>★김</td><td>조미 안 된 김을 잘게</td></tr></tbody></table></div>
+<h3 class="plan-sec">9주차 · 연어, 호두, 설 연휴</h3>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>2/1 (월)</td><td>쌀 25g + 소고기 15g + 브로콜리 25g + 연어 3g</td><td>쌀 25g + 닭고기 15g + 감자 15g + 당근 10g</td><td>◆연어</td><td>껍질·가시 제거</td></tr><tr><td>2/2 (화)</td><td>쌀 25g + 연어 15g + 애호박 15g + 양파 10g</td><td>쌀 25g + 소고기 15g + 시금치 10g + 고구마 15g</td><td></td><td></td></tr><tr><td>2/3 (수)</td><td>쌀 25g + 소고기 15g + 양배추 25g, 간식 딸기 10g</td><td>쌀 25g + 두부 15g + 토마토 10g + 애호박 15g + 땅콩버터 3g</td><td>★딸기</td><td>꼭지 떼고 으깨서</td></tr><tr><td>2/4 (목)</td><td>쌀 25g + 소고기 15g + 단호박 25g + 호두 1g</td><td>쌀 25g + 돼지고기 15g + 청경채 25g</td><td>◆호두</td><td>곱게 갈아서</td></tr><tr><td>2/5 (금)</td><td>쌀 25g + 소고기 15g + 콜리플라워 15g + 감자 10g + 호두 3g</td><td>쌀 25g + 대구살 15g + 브로콜리 25g + 참깨 2g</td><td></td><td></td></tr><tr><td>2/6 (토, 연휴)</td><td>쌀 25g + 소고기 15g + 표고버섯 10g + 애호박 15g + 달걀 10g</td><td>쌀 25g + 닭고기 15g + 고구마 25g + 새우살 5g</td><td></td><td>새 재료 없음</td></tr><tr><td>2/7 (일, 설날)</td><td>쌀 25g + 소고기 15g + 시금치 10g + 당근 15g + 밀국수 10g</td><td>쌀 25g + 연어 15g + 양배추 25g</td><td></td><td>새 재료 없음</td></tr></tbody></table></div>
+<h3 class="plan-sec">10주차 · 잣, 5배죽으로</h3>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>2/8 (월, 연휴)</td><td>쌀 25g + 소고기 20g + 브로콜리 15g + 단호박 15g + 두부 10g</td><td>쌀 25g + 돼지고기 20g + 애호박 30g</td><td></td><td>새 재료 없음</td></tr><tr><td>2/9 (화, 대체공휴일)</td><td>쌀 25g + 소고기 20g + 토마토 15g + 양파 15g</td><td>쌀 25g + 닭고기 20g + 감자 15g + 파프리카 15g + 땅콩버터 3g</td><td></td><td>새 재료 없음</td></tr><tr><td>2/10 (수)</td><td>쌀 20g + 현미 5g + 소고기 20g + 청경채 15g + 당근 15g</td><td>쌀 25g + 대구살 20g + 콜리플라워 30g + 호두 3g</td><td>★현미</td><td>푹 불려서</td></tr><tr><td>2/11 (목)</td><td>쌀 25g + 소고기 20g + 애호박 30g + 잣 1g</td><td>쌀 25g + 연어 20g + 고구마 30g</td><td>◆잣</td><td>곱게 갈아서</td></tr><tr><td>2/12 (금)</td><td>쌀 25g + 소고기 20g + 양배추 15g + 표고버섯 15g + 잣 3g</td><td>쌀 25g + 두부 15g + 시금치 15g + 단호박 15g + 달걀 10g</td><td></td><td></td></tr><tr><td>2/13 (토)</td><td>쌀 25g + 소고기 20g + 완두콩 10g + 감자 20g</td><td>쌀 25g + 돼지고기 20g + 브로콜리 30g + 참깨 2g</td><td>★완두콩</td><td>껍질 벗겨 으깨기</td></tr><tr><td>2/14 (일)</td><td>쌀 25g + 소고기 20g + 애호박 20g + 아보카도 10g</td><td>쌀 25g + 닭고기 20g + 토마토 15g + 양파 15g + 새우살 5g</td><td>★아보카도</td><td></td></tr></tbody></table></div>
+<h3 class="plan-sec">11주차 · 고등어, 게살</h3>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>2/15 (월)</td><td>쌀 25g + 소고기 15g + 무 15g + 애호박 15g + 고등어 3g</td><td>쌀 25g + 닭고기 20g + 단호박 30g</td><td>◆고등어</td><td>껍질·가시 제거</td></tr><tr><td>2/16 (화)</td><td>쌀 25g + 고등어 20g + 감자 15g + 양배추 15g</td><td>쌀 25g + 소고기 20g + 청경채 30g + 땅콩버터 3g</td><td></td><td></td></tr><tr><td>2/17 (수)</td><td>쌀 25g + 소고기 20g + 배추 15g + 당근 15g</td><td>쌀 25g + 두부 20g + 브로콜리 30g + 호두 3g</td><td>★배추</td><td>잎 부분</td></tr><tr><td>2/18 (목)</td><td>쌀 25g + 소고기 20g + 애호박 30g + 게살 2g</td><td>쌀 25g + 연어 20g + 고구마 30g</td><td>◆게</td><td>게를 쪄서 살만. 맛살은 X</td></tr><tr><td>2/19 (금)</td><td>쌀 25g + 소고기 20g + 콜리플라워 15g + 양파 15g + 게살 5g</td><td>쌀 25g + 돼지고기 20g + 시금치 15g + 감자 15g + 잣 3g</td><td></td><td></td></tr><tr><td>2/20 (토)</td><td>쌀 20g + 보리 5g + 소고기 20g + 표고버섯 15g + 단호박 15g</td><td>쌀 25g + 닭고기 20g + 토마토 15g + 파프리카 15g + 참깨 2g</td><td>★보리</td><td></td></tr><tr><td>2/21 (일)</td><td>쌀 25g + 소고기 20g + 미역 5g + 무 25g</td><td>쌀 25g + 대구살 20g + 애호박 30g + 달걀 10g</td><td>★미역</td><td>불린 미역 무게</td></tr></tbody></table></div>
+<h3 class="plan-sec">12주차 · 아기치즈</h3>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>2/22 (월)</td><td>쌀 25g + 소고기 20g + 브로콜리 30g + 아기치즈 2g</td><td>쌀 25g + 닭고기 20g + 고구마 30g</td><td>◆아기치즈</td><td>저염 아기치즈, 2g = 약 1/8장</td></tr><tr><td>2/23 (화)</td><td>쌀 25g + 소고기 20g + 감자 15g + 양파 15g + 아기치즈 5g</td><td>쌀 25g + 고등어 20g + 배추 30g</td><td></td><td></td></tr><tr><td>2/24 (수)</td><td>쌀 25g + 소고기 20g + 비트 10g + 애호박 20g</td><td>쌀 25g + 두부 20g + 청경채 30g + 새우살 5g</td><td>★비트</td><td>대변이 붉어질 수 있음</td></tr><tr><td>2/25 (목)</td><td>쌀 25g + 소고기 20g + 양배추 30g, 간식 귤 10g</td><td>쌀 25g + 연어 20g + 시금치 15g + 단호박 15g + 땅콩버터 3g</td><td>★귤</td><td>속껍질·씨 제거</td></tr><tr><td>2/26 (금)</td><td>쌀 25g + 소고기 20g + 표고버섯 15g + 당근 15g + 호두 3g</td><td>쌀 25g + 돼지고기 20g + 콜리플라워 30g + 게살 5g</td><td></td><td></td></tr><tr><td>2/27 (토)</td><td>쌀 25g + 소고기 20g + 밤 10g + 브로콜리 20g</td><td>쌀 25g + 닭고기 20g + 완두콩 10g + 감자 20g + 잣 3g</td><td>★밤</td><td>쪄서 곱게 으깨기</td></tr><tr><td>2/28 (일)</td><td>쌀 20g + 현미 5g + 소고기 20g + 토마토 15g + 애호박 15g + 달걀 10g</td><td>쌀 25g + 대구살 20g + 미역 5g + 무 25g</td><td></td><td></td></tr></tbody></table></div>
+<h3 class="plan-sec">13주차 · 후기 준비</h3>
+<p>새 알레르기 식품 없이 곡물과 채소를 넓히는 주예요. 만 9개월 무렵 하루 3회 후기로 넘어가요.</p>
+<div class="plan-table"><table><thead><tr><th>날짜</th><th>오전 (1회분)</th><th>오후 (1회분)</th><th>새 재료</th><th>메모</th></tr></thead><tbody><tr><td>3/1 (월, 삼일절)</td><td>쌀 25g + 소고기 20g + 배추 15g + 표고버섯 15g + 두부 10g</td><td>쌀 25g + 고등어 20g + 고구마 30g + 참깨 2g</td><td></td><td>새 재료 없음</td></tr><tr><td>3/2 (화)</td><td>쌀 20g + 수수 5g + 소고기 20g + 단호박 30g</td><td>쌀 25g + 닭고기 20g + 시금치 15g + 양파 15g + 아기치즈 5g</td><td>★수수</td><td>푹 불려서</td></tr><tr><td>3/3 (수)</td><td>쌀 25g + 소고기 20g + 숙주 10g + 당근 20g</td><td>쌀 25g + 연어 20g + 애호박 30g + 땅콩버터 3g</td><td>★숙주</td><td>잘게 다지기</td></tr><tr><td>3/4 (목)</td><td>쌀 25g + 소고기 20g + 연근 10g + 감자 20g</td><td>쌀 25g + 돼지고기 20g + 브로콜리 30g + 호두 3g</td><td>★연근</td><td>푹 익혀 갈기</td></tr><tr><td>3/5 (금)</td><td>쌀 25g + 소고기 20g + 파프리카 15g + 양배추 15g + 새우살 5g</td><td>쌀 25g + 두부 20g + 비트 10g + 애호박 20g + 게살 5g</td><td></td><td></td></tr><tr><td>3/6 (토)</td><td>쌀 20g + 보리 5g + 소고기 20g + 콜리플라워 30g + 달걀 10g</td><td>쌀 25g + 닭고기 20g + 토마토 15g + 아보카도 15g + 잣 3g</td><td></td><td></td></tr><tr><td>3/7 (일)</td><td>쌀 25g + 소고기 20g + 미역 5g + 무 25g</td><td>쌀 25g + 대구살 20g + 고구마 30g + 참깨 2g</td><td></td><td></td></tr></tbody></table></div>
+<h3 class="plan-sec">알레르기 관찰과 주의사항</h3>
+<p>새 알레르기 식품을 먹인 뒤 2시간은 가까이서 지켜봐 주세요. 대부분의 반응은 이 시간 안에 나타나요.</p>
+<div class="plan-table"><table><thead><tr><th>증상</th><th>대처</th></tr></thead><tbody><tr><td>입 주변 발적, 몸의 두드러기, 한두 번 구토</td><td>그 재료를 멈추고 사진을 찍어 두고 소아과 진료</td></tr><tr><td>얼굴·입술 붓기, 반복 구토, 쌌쌌거림·숨차함, 축 처짐</td><td>바로 119 또는 응급실</td></tr></tbody></table></div>
+<p><strong>일정 조정</strong></p>
+<ul class="plan-list"><li>6개월 접종일과 그 다음 날에는 새 재료를 넣지 말고, 뒤 일정을 하루씩 밀어요.</li><li>열, 감기, 설사가 있는 날도 아는 재료만 주고 일정을 미뤄요.</li><li>반응이 있었던 재료는 소아과와 상의하기 전까지 다시 주지 않아요.</li></ul>
+<p><strong>유지와 금지</strong></p>
+<ul class="plan-list"><li>통과한 알레르기 식품은 각각 주 2~3회씩 계속 먹여요.</li><li>돌 전에는 꿀, 생우유(마시는 용도), 통견과류 같은 질식 위험 형태는 피해요.</li><li>시금치, 당근, 비트는 질산염 때문에 중기부터 써요.</li><li>메밀, 오징어, 조개류, 복숭아는 후기에 같은 방식으로 넣어요.</li></ul>
+<p>아기 피부에 습진이 심하거나 가족 중 식품 알레르기가 있다면, 시작 전에 소아과에서 먼저 상의하세요.</p>
+      </div>
     </section>
   </main>
 
@@ -513,7 +615,20 @@
   var STORE = "babyfood.entries.v1";
   var THEME = "babyfood.theme.v1";
 
-  // ---- storage ----
+  // ---- storage: NAS (PocketBase) when reachable, else local browser storage ----
+  // Uses a same-origin /api backend when one answers (page served by PocketBase
+  // on the NAS). With no backend (e.g. GitHub Pages) it falls back to local
+  // browser storage. No server address is hard-coded here.
+  var API_BASE = "";
+  try { API_BASE = localStorage.getItem("babyfood.apiBase") || ""; } catch (e) {}
+  var RECORDS = API_BASE + "/api/collections/entries/records";
+  var POLL_MS = 5000;
+
+  var MODE = "connecting";   // "nas" | "local" | "connecting"
+  var entries = [];
+  var pollTimer = null;
+  var refreshing = false;
+
   function load() {
     try {
       var raw = localStorage.getItem(STORE);
@@ -525,107 +640,168 @@
   function save() {
     try { localStorage.setItem(STORE, JSON.stringify(entries)); } catch (e) {}
   }
-  var entries = load();
-
-  // ---- storage mode: cloud (db capability) with local fallback ----
-  var cloudDb = null;      // db namespace once resolved
-  var CLOUD = false;       // true while cloud store is active
-  var migrationDone = false;
+  function byTs(a, b) { return (a.ts || 0) - (b.ts || 0); }
 
   function rerenderAll() {
     renderCalendar();
     if (!$("#tab-history").hidden) renderHistory();
     if (!$("#tab-stats").hidden) renderStats();
+    if (typeof refreshPlanMarks === "function" && $("#tab-plan") && !$("#tab-plan").hidden) refreshPlanMarks();
   }
-  function stripEntry(e) {
+
+  function showCloudStatus(mode) {
+    var el = document.getElementById("storageStatus"); if (!el) return;
+    var map = {
+      connecting: "🔌 연결 확인 중…",
+      nas: "🟢 NAS 서버에 저장됨 · 기기 간 동기화",
+      local: "💾 이 브라우저에 로컬 저장"
+    };
+    el.textContent = map[mode] || "";
+    el.dataset.mode = (mode === "nas" ? "cloud" : (mode === "local" ? "local" : "connecting"));
+  }
+
+  function rec2entry(r) {
     return {
-      date: e.date, name: e.name,
-      amount: (e.amount == null ? "" : e.amount),
-      unit: (e.unit == null ? "" : e.unit),
+      id: r.id,
+      date: r.date,
+      name: r.name,
+      amount: (r.amount == null ? "" : String(r.amount)),
+      unit: (r.unit == null ? "" : String(r.unit)),
+      react: r.react || "none",
+      memo: r.memo || "",
+      ts: (typeof r.ts === "number" ? r.ts : (r.ts ? parseInt(r.ts, 10) : 0))
+    };
+  }
+  function entry2body(e) {
+    return {
+      date: e.date,
+      name: e.name,
+      amount: (e.amount == null ? "" : String(e.amount)),
+      unit: (e.unit == null ? "" : String(e.unit)),
       react: e.react || "none",
       memo: e.memo || "",
       ts: (typeof e.ts === "number" ? e.ts : Date.now())
     };
   }
-  function showCloudStatus(mode) {
-    var el = document.getElementById("storageStatus"); if (!el) return;
-    var map = {
-      connecting: "☁️ 클라우드 연결 중…",
-      cloud: "☁️ 클라우드에 저장됨 · 기기 간 동기화",
-      local: "💾 이 브라우저에 저장됨",
-      slow: "⚠️ 클라우드 연결이 느려요"
-    };
-    el.textContent = map[mode] || "";
-    el.dataset.mode = mode;
+
+  function jsonFetch(url, opts) {
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    if (opts.body != null) opts.headers["Content-Type"] = "application/json";
+    return fetch(url, opts).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (r.status === 204) return null;
+      return r.json();
+    });
   }
 
-  function cloudSet(e) { try { cloudDb.collection("entries").doc(e.id).set(stripEntry(e)).catch(function () {}); } catch (x) {} }
-  function cloudDel(id) { try { cloudDb.collection("entries").doc(id).delete().catch(function () {}); } catch (x) {} }
+  var saveFailMsg = "서버에 저장하지 못했어요 · 연결을 확인하세요";
 
-  function upsertEntry(e) {
-    var i = entries.findIndex(function (x) { return x.id === e.id; });
-    if (i >= 0) entries[i] = e; else entries.push(e);
-    if (CLOUD && cloudDb) cloudSet(e); else save();
-    rerenderAll();
+  // Pull the full list from the NAS and repaint (NAS mode only).
+  function refresh() {
+    if (MODE !== "nas" || refreshing) return Promise.resolve();
+    refreshing = true;
+    return jsonFetch(RECORDS + "?perPage=1000&sort=ts", {}).then(function (data) {
+      refreshing = false;
+      var arr = (data && data.items ? data.items : []).map(rec2entry);
+      arr.sort(byTs);
+      entries = arr; save(); rerenderAll();
+    }, function () { refreshing = false; });
   }
-  function deleteEntryById(id) {
-    entries = entries.filter(function (x) { return x.id !== id; });
-    if (CLOUD && cloudDb) cloudDel(id); else save();
-    rerenderAll();
-  }
-  function bulkAddEntries(arr) {
-    arr.forEach(function (e) { entries.push(e); });
-    if (CLOUD && cloudDb) arr.forEach(cloudSet); else save();
-    rerenderAll();
-  }
-  function replaceAllEntries(arr) {
-    if (CLOUD && cloudDb) {
-      var newIds = {}; arr.forEach(function (e) { newIds[e.id] = 1; });
-      entries.forEach(function (e) { if (!newIds[e.id]) cloudDel(e.id); });
-      arr.forEach(cloudSet);
+
+  function createEntry(data) {
+    if (MODE === "nas") {
+      var body = entry2body(Object.assign({ ts: Date.now() }, data));
+      jsonFetch(RECORDS, { method: "POST", body: JSON.stringify(body) }).then(function (rec) {
+        entries.push(rec2entry(rec)); entries.sort(byTs); save(); rerenderAll();
+      }, function () { toast(saveFailMsg); });
+    } else {
+      entries.push(Object.assign({ id: uid(), ts: Date.now() }, data));
+      entries.sort(byTs); save(); rerenderAll();
     }
-    entries = arr.slice();
-    if (!(CLOUD && cloudDb)) save();
-    rerenderAll();
   }
 
-  function migrateLocalToCloud() {
-    var local = load();
-    if (!local.length) return;
-    local.forEach(function (e) { if (e && e.id) cloudSet(e); });
-    toast("기존 기록을 클라우드로 옮겨어요 ☁️");
+  function updateEntry(id, data) {
+    var existing = entries.find(function (x) { return x.id === id; }) || {};
+    var merged = Object.assign({}, existing, data, { id: id });
+    if (MODE === "nas") {
+      jsonFetch(RECORDS + "/" + encodeURIComponent(id),
+        { method: "PATCH", body: JSON.stringify(entry2body(merged)) }).then(function (rec) {
+        var i = entries.findIndex(function (x) { return x.id === id; });
+        if (i >= 0) entries[i] = rec2entry(rec); save(); rerenderAll();
+      }, function () { toast(saveFailMsg); });
+    } else {
+      var i = entries.findIndex(function (x) { return x.id === id; });
+      if (i >= 0) entries[i] = merged; save(); rerenderAll();
+    }
   }
-  function initCloud() {
-    showCloudStatus("connecting");
-    var slow = setTimeout(function () { if (!CLOUD) showCloudStatus("slow"); }, 10000);
-    window.claude.use("db").then(function (db) {
-      if (!db) { clearTimeout(slow); showCloudStatus("local"); maybeSeed(); rerenderAll(); return; }
-      cloudDb = db;
-      cloudDb.collection("entries").onSnapshot(function (snap) {
-        clearTimeout(slow);
-        CLOUD = true;
-        var arr = [];
-        snap.docs.forEach(function (d) {
-          var v = d.data() || {};
-          arr.push({ id: d.id, date: v.date, name: v.name,
-            amount: (v.amount == null ? "" : v.amount), unit: (v.unit == null ? "" : v.unit),
-            react: v.react || "none", memo: v.memo || "", ts: (typeof v.ts === "number" ? v.ts : 0) });
+
+  function deleteEntryById(id) {
+    if (MODE === "nas") {
+      jsonFetch(RECORDS + "/" + encodeURIComponent(id), { method: "DELETE" }).then(function () {
+        entries = entries.filter(function (x) { return x.id !== id; }); save(); rerenderAll();
+      }, function () { toast("서버에서 삭제하지 못했어요 · 연결을 확인하세요"); });
+    } else {
+      entries = entries.filter(function (x) { return x.id !== id; }); save(); rerenderAll();
+    }
+  }
+
+  function bulkAddEntries(arr) {
+    if (!arr.length) return;
+    if (MODE === "nas") {
+      var chain = Promise.resolve(); var added = 0;
+      arr.forEach(function (e) {
+        chain = chain.then(function () {
+          return jsonFetch(RECORDS, { method: "POST", body: JSON.stringify(entry2body(e)) })
+            .then(function () { added++; }, function () {});
         });
-        arr.sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); });
-        entries = arr;
-        showCloudStatus("cloud");
-        if (!snap.metadata.fromCache && !migrationDone) {
-          migrationDone = true;
-          if (snap.empty) migrateLocalToCloud();
-        }
-        rerenderAll();
-      }, function () {
-        clearTimeout(slow);
-        CLOUD = false; cloudDb = null;
-        showCloudStatus("local");
-        entries = load(); rerenderAll();
       });
-    }, function () { clearTimeout(slow); showCloudStatus("local"); maybeSeed(); rerenderAll(); });
+      chain.then(function () {
+        refresh().then(function () {
+          if (added < arr.length) toast("일부만 저장됐어요 (" + added + "/" + arr.length + ")");
+        });
+      });
+    } else {
+      arr.forEach(function (e) { entries.push(e); }); entries.sort(byTs); save(); rerenderAll();
+    }
+  }
+
+  function replaceAllEntries(arr) {
+    if (MODE === "nas") {
+      var ids = entries.map(function (e) { return e.id; });
+      var chain = Promise.resolve();
+      ids.forEach(function (id) {
+        chain = chain.then(function () {
+          return jsonFetch(RECORDS + "/" + encodeURIComponent(id), { method: "DELETE" })
+            .then(function () {}, function () {});
+        });
+      });
+      arr.forEach(function (e) {
+        chain = chain.then(function () {
+          return jsonFetch(RECORDS, { method: "POST", body: JSON.stringify(entry2body(e)) })
+            .then(function () {}, function () {});
+        });
+      });
+      chain.then(function () { refresh(); });
+    } else {
+      entries = arr.slice(); save(); rerenderAll();
+    }
+  }
+
+  function initServer() {
+    showCloudStatus("connecting");
+    entries = load(); rerenderAll();          // instant paint from cache
+    jsonFetch(RECORDS + "?perPage=1", {}).then(function () {
+      MODE = "nas"; showCloudStatus("nas");
+      refresh();
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(function () { if (document.visibilityState === "visible") refresh(); }, POLL_MS);
+      window.addEventListener("focus", function () { refresh(); });
+      document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") refresh(); });
+    }, function () {
+      MODE = "local"; showCloudStatus("local");
+      entries = load(); maybeSeed(); rerenderAll();
+    });
   }
 
   // ---- helpers ----
@@ -644,14 +820,16 @@
 
   function iconFor(name) {
     var map = [
-      ["쌀|미음|죽|밥", "🍚"], ["소고기|쇠고기|한우", "🥩"], ["닭|치킨", "🍗"], ["돼지", "🐷"],
-      ["생선|대구|연어|고등어", "🐟"], ["계란|달걀|노른자", "🥚"], ["두부|콩", "🫘"],
-      ["애호박|호박", "🎃"], ["당근", "🥕"], ["브로콜리", "🥦"], ["감자", "🥔"], ["고구마", "🍠"],
-      ["시금치|청경채|배추|양배추|채소|나물", "🥬"], ["양파|대파|파", "🧅"], ["버섯", "🍄"],
+      ["쌀|미음|죽|밥|현미", "🍚"], ["오트밀|귀리", "🥣"], ["소고기|쇠고기|한우", "🥩"], ["닭|치킨", "🍗"], ["돼지", "🐷"],
+      ["생선|대구|연어|고등어|멸치", "🐟"], ["계란|달걀|노른자", "🥚"], ["두부|콩", "🫘"],
+      ["애호박|호박", "🎃"], ["당근", "🥕"], ["브로콜리|콜리플라워", "🥦"], ["감자", "🥔"], ["고구마", "🍠"],
+      ["파프리카|피망", "🫑"], ["비트", "🫜"],
+      ["시금치|청경채|배추|양배추|채소|나물|무", "🥬"], ["양파|대파|파", "🧅"], ["버섯", "🍄"],
       ["토마토", "🍅"], ["옥수수", "🌽"], ["완두|콩", "🫛"], ["오이", "🥒"], ["가지", "🍆"],
       ["사과", "🍎"], ["배", "🍐"], ["바나나", "🍌"], ["딸기", "🍓"], ["블루베리", "🫐"],
-      ["귤|오렌지", "🍊"], ["수박", "🍉"], ["포도", "🍇"], ["복숭아", "🍑"], ["망고", "🥭"], ["아보카도", "🥑"],
-      ["분유|모유|우유|요거트|치즈", "🥛"], ["미역|김|해조", "🌿"], ["밤|견과|호두|잣", "🌰"]
+      ["귤|오렌지", "🍊"], ["수박", "🍉"], ["포도", "🍇"], ["복숭아|자두", "🍑"], ["망고", "🥭"], ["아보카도", "🥑"],
+      ["분유|모유|우유|요거트|치즈", "🥛"], ["미역|김|해조", "🌿"], ["밤|견과|호두|잣", "🌰"],
+      ["참기름|들기름|기름", "🫗"]
     ];
     for (var i = 0; i < map.length; i++) { if (new RegExp(map[i][0]).test(name)) return map[i][1]; }
     return "🥄";
@@ -699,9 +877,10 @@
   // ---- tabs ----
   function showTab(name) {
     $all("nav.tabs button").forEach(function (b) { b.setAttribute("aria-selected", b.dataset.tab === name); });
-    ["calendar", "history", "stats"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
+    ["calendar", "history", "stats", "plan"].forEach(function (t) { $("#tab-" + t).hidden = t !== name; });
     if (name === "history") renderHistory();
     if (name === "stats") renderStats();
+    if (name === "plan") { enhancePlanTab(); refreshPlanMarks(); }
     window.scrollTo(0, 0);
   }
   $all("nav.tabs button").forEach(function (b) { b.addEventListener("click", function () { showTab(b.dataset.tab); }); });
@@ -1039,16 +1218,13 @@
       memo: $("#fMemo").value.trim(),
       date: $("#fDate").value
     };
-    var entry;
     if (id) {
-      var existing = entries.find(function (x) { return x.id === id; }) || {};
-      entry = Object.assign({}, existing, data, { id: id });
+      updateEntry(id, data);
       toast("수정했어요");
     } else {
-      entry = Object.assign({}, data, { id: uid(), ts: Date.now() });
+      createEntry(data);
       toast("기록했어요 🍼");
     }
-    upsertEntry(entry);
     closeSheet();
   });
   $("#sheetCancel").addEventListener("click", closeSheet);
@@ -1126,20 +1302,8 @@
     } catch (e) { toast("이 환경에선 저장이 막혀 있어요 · 내용 복사를 이용하세요"); }
   }
   function saveFile(name, text) {
-    var api = (window.claude && window.claude.use) ? window.claude.use("downloads") : null;
-    if (api && typeof api.then === "function") {
-      api.then(function (downloads) {
-        if (!downloads) { blobFallback(name, text); return; }
-        downloads.save({ filename: name, data: text }).then(function () {
-          toast("저장했어요 💾");
-        }, function (err) {
-          if (err && err.code === "declined") { toast("저장을 취소했어요"); }
-          else { blobFallback(name, text); }
-        });
-      }, function () { blobFallback(name, text); });
-    } else {
-      blobFallback(name, text);
-    }
+    // served over normal HTTP(S) from the NAS, so a plain browser download works
+    blobFallback(name, text);
   }
   $("#saveFileBtn").addEventListener("click", function () { saveFile($("#exportName").textContent, $("#exportBox").value); });
 
@@ -1224,15 +1388,153 @@
     toast("예시 기록을 넣어뒀어요");
   }
 
+  // ---- meal-plan rows -> records ----
+  var planEnhanced = false;
+  function parsePlanDate(s) {
+    var m = String(s).match(/(\d{1,2})\s*\/\s*(\d{1,2})/);
+    if (!m) return null;
+    var mo = +m[1], da = +m[2];
+    var yr = (mo === 12 ? 2026 : 2027);   // plan starts Dec 2026, runs into early 2027
+    return yr + "-" + pad(mo) + "-" + pad(da);
+  }
+  function parsePlanItems(s) {
+    if (!s) return [];
+    return String(s).split("+").map(function (t) { return t.trim(); }).filter(Boolean).map(function (t) {
+      var m = t.match(/^(.*?)\s*([0-9][0-9.~\/]*)\s*(g|ml|스푼|큰술|개|컵)?$/);
+      if (m && m[1].trim()) return { name: m[1].trim(), amount: m[2], unit: m[3] || "" };
+      return { name: t, amount: "", unit: "" };
+    }).filter(function (it) { return it.name; });
+  }
+  function planMealLabel(h) {
+    h = (h || "").trim();
+    if (h.indexOf("오전") === 0) return "오전";
+    if (h.indexOf("오후") === 0) return "오후";
+    if (h.indexOf("재료") === 0) return "";
+    return null;
+  }
+  function planStartDate() {
+    var v; try { v = localStorage.getItem("babyfood.planStart"); } catch (e) {}
+    return (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : ymd(new Date());
+  }
+  function dateFromDay(n) {
+    var base = parseYmd(planStartDate());
+    base.setDate(base.getDate() + (n - 1));
+    return ymd(base);
+  }
+  function planAddStartControl(sec) {
+    var wrap = sec.querySelector(".plan");
+    if (!wrap || $("#planStartInput")) return;
+    var ctl = document.createElement("div");
+    ctl.className = "plan-start";
+    ctl.innerHTML = '\uD83D\uDDD3\uFE0F \uC2DC\uC791\uC77C <input type="date" id="planStartInput"><div class="plan-start-note">\u2018+\uAE30\uB85D\u2019\uC740 \uC774 \uB0A0\uC744 <b>1\uC77C\uCC28</b>\uB85C \uACC4\uC0B0\uD574 \uB2F4\uC544\uC694</div>';
+    wrap.insertBefore(ctl, wrap.firstChild);
+    var inp = $("#planStartInput");
+    inp.value = planStartDate();
+    inp.addEventListener("change", function () {
+      if (inp.value) { try { localStorage.setItem("babyfood.planStart", inp.value); } catch (e) {} toast("\uC2DC\uC791\uC77C\uC744 " + fmtDate(inp.value) + "(\uC73C)\uB85C \uC124\uC815\uD588\uC5B4\uC694"); refreshPlanMarks(); }
+    });
+  }
+  function planAddDialog(defaultDate, label, onConfirm) {
+    var ov = $("#planAddOverlay");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.className = "overlay"; ov.id = "planAddOverlay";
+      ov.innerHTML = '<div class="confirm-box">' +
+        '<p id="planAddMsg"></p>' +
+        '<div class="plan-add-date"><label for="planAddDate">담을 날짜</label><input type="date" id="planAddDate"></div>' +
+        '<div class="row"><button type="button" class="btn ghost" id="planAddNo">취소</button>' +
+        '<button type="button" class="btn" id="planAddYes">추가</button></div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener("click", function (e) { if (e.target === ov) ov.classList.remove("open"); });
+      $("#planAddNo").addEventListener("click", function () { ov.classList.remove("open"); });
+    }
+    $("#planAddMsg").textContent = label + " · 담을 날짜를 확인하세요";
+    $("#planAddDate").value = defaultDate;
+    var yes = $("#planAddYes");
+    var ny = yes.cloneNode(true); yes.parentNode.replaceChild(ny, yes);
+    ny.addEventListener("click", function () {
+      var d = $("#planAddDate").value || defaultDate;
+      ov.classList.remove("open");
+      onConfirm(d);
+    });
+    ov.classList.add("open");
+  }
+  var planButtons = [];
+  function planAddedMap() { try { return JSON.parse(localStorage.getItem("babyfood.planAdded") || "{}"); } catch (e) { return {}; } }
+  function planMarkAddedKey(key, date) { var m = planAddedMap(); m[key] = date; try { localStorage.setItem("babyfood.planAdded", JSON.stringify(m)); } catch (e) {} }
+  function enhancePlanTab() {
+    if (planEnhanced) return;
+    var sec = $("#tab-plan"); if (!sec) return;
+    planAddStartControl(sec);
+    planButtons = [];
+    var planDay = 0;
+    $all(".plan-table table", sec).forEach(function (tbl) {
+      var ths = $all("thead th", tbl);
+      if (!ths.length || ths[0].textContent.trim() !== "날짜") return;   // schedule tables only
+      var cols = [];
+      ths.forEach(function (th, idx) {
+        var lb = planMealLabel(th.textContent);
+        if (idx > 0 && lb !== null) cols.push({ idx: idx, label: lb });
+      });
+      if (!cols.length) return;
+      var hr = $("thead tr", tbl);
+      if (hr) { var hc = document.createElement("th"); hc.textContent = "담기"; hc.className = "plan-add-h"; hr.appendChild(hc); }
+      $all("tbody tr", tbl).forEach(function (tr) {
+        var tds = tr.children; if (!tds.length) return;
+        var isDay = parsePlanDate(tds[0].textContent) != null;
+        if (isDay) { planDay++; tds[0].textContent = planDay + "일차"; }
+        var dayN = planDay;
+        var td = document.createElement("td"); td.className = "plan-add-cell";
+        if (isDay) {
+          cols.forEach(function (c) {
+            var mealItems = tds[c.idx] ? parsePlanItems(tds[c.idx].textContent) : [];
+            if (!mealItems.length) return;
+            var base = c.label || "+기록";
+            var btn = document.createElement("button");
+            btn.type = "button"; btn.className = "plan-add"; btn.textContent = base;
+            btn.addEventListener("click", function () {
+              var defDate = dateFromDay(dayN);
+              var names = mealItems.map(function (i) { return i.name + (i.amount ? " " + i.amount + i.unit : ""); }).join(", ");
+              var head = dayN + "일차" + (c.label ? " " + c.label : "") + " · " + names;
+              planAddDialog(defDate, head, function (chosen) {
+                var es = mealItems.map(function (it, k) {
+                  return { id: uid(), ts: Date.now() + k, date: chosen, name: it.name, amount: it.amount, unit: it.unit, react: "none", memo: c.label };
+                });
+                bulkAddEntries(es);
+                planMarkAddedKey(dayN + "|" + c.label, chosen);
+                toast(es.length + "개 기록에 담았어요 🍼");
+                setTimeout(refreshPlanMarks, 1500);
+              });
+            });
+            td.appendChild(btn);
+            planButtons.push({ btn: btn, dayN: dayN, label: c.label, base: base, names: mealItems.map(function (i) { return i.name; }) });
+          });
+        }
+        tr.appendChild(td);
+      });
+    });
+    planEnhanced = true;
+    refreshPlanMarks();
+  }
+  function refreshPlanMarks() {
+    if (!planButtons.length) return;
+    var m = planAddedMap();
+    planButtons.forEach(function (b) {
+      var cands = [dateFromDay(b.dayN)];
+      var stored = m[b.dayN + "|" + b.label]; if (stored) cands.push(stored);
+      var added = entries.some(function (e) {
+        return cands.indexOf(e.date) >= 0 && (e.memo || "") === b.label && b.names.indexOf(e.name) >= 0;
+      });
+      b.btn.classList.toggle("added", added);
+      b.btn.textContent = added ? ("✓ " + (b.label || "담김")) : b.base;
+    });
+  }
+
   // ---- init ----
   initTheme();
-  if (window.claude && window.claude.use) {
-    renderCalendar();
-    initCloud();
-  } else {
-    maybeSeed();
-    renderCalendar();
-  }
+  entries = load();        // instant paint from the local cache
+  renderCalendar();
+  initServer();            // connect to the NAS (PocketBase) and poll for changes
 })();
 </script>
 

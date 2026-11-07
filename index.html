@@ -390,6 +390,25 @@
   .plan-week.open .pw-chev { transform: rotate(90deg); }
   .plan-week:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
   .plan-body { padding-bottom: 10px; }
+  /* 내역탭: 하루 기록을 한 카드에 컴팩트한 행으로, 영양소 색 띠 */
+  .hist-card { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); overflow: hidden; }
+  .hist-card .entry { border: none; border-radius: 0; padding: 7px 10px 7px 12px; align-items: center; gap: 8px; }
+  .day-group .hist-card .entry + .entry { margin-top: 0; border-top: 1px solid var(--line); }
+  .hist-card .entry .ing-ico { font-size: 1.05rem; margin-top: 0; }
+  .hist-card .entry .body { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+  .hist-card .entry .name { font-size: .9rem; }
+  .hist-card .entry .meta { margin-top: 0; }
+  .hist-card .entry .memo { flex-basis: 100%; margin-top: 0; font-size: .76rem; }
+  .hist-card .entry .acts { flex-direction: row; gap: 4px; }
+  .hist-card .icon-btn { width: 28px; height: 28px; font-size: .78rem; }
+  .hist-card .entry[data-cat="grain"]   { box-shadow: inset 3px 0 0 #e0a94e; }
+  .hist-card .entry[data-cat="protein"] { box-shadow: inset 3px 0 0 #d9795f; }
+  .hist-card .entry[data-cat="veg"]     { box-shadow: inset 3px 0 0 #6fa85c; }
+  .hist-card .entry[data-cat="fruit"]   { box-shadow: inset 3px 0 0 #cf6f98; }
+  .hist-card .entry[data-cat="etc"]     { box-shadow: inset 3px 0 0 #5f93c4; }
+  .hist-card .entry[data-cat="other"]   { box-shadow: inset 3px 0 0 #9b8e7d; }
+  .day-group { margin-top: 12px; }
+  .day-group > .dg-date { margin-bottom: 6px; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -525,8 +544,7 @@
       <input type="hidden" id="fDate">
       <div class="field">
         <label for="fName">재료 이름</label>
-        <input id="fName" list="ingList" placeholder="예: 쌀미음, 애호박, 소고기" autocomplete="off" required>
-        <datalist id="ingList"></datalist>
+        <input id="fName" placeholder="예: 쌀미음, 애호박, 소고기" autocomplete="off" required>
         <div class="chips" id="quickChips"></div>
         <div class="chip-hint">목록에 없는 재료는 위 칸에 직접 입력하면 돼요. ✍️</div>
       </div>
@@ -979,7 +997,7 @@
                     e.react === "bad" ? '<span class="react bad">😣 이상</span>' : '';
     var amt = (e.amount !== "" && e.amount != null) ? '<span class="amt-badge">' + esc(e.amount) + (e.unit ? esc(e.unit) : '') + '</span>' : '';
     var dateHtml = showDate ? '<span>' + fmtDate(e.date) + '</span>' : '';
-    return '<div class="entry" data-id="' + e.id + '">' +
+    return '<div class="entry" data-id="' + e.id + '" data-cat="' + nutrientOf(e.name).key + '">' +
       '<span class="ing-ico">' + iconFor(e.name) + '</span>' +
       '<div class="body"><div class="name">' + esc(e.name) + '</div>' +
       '<div class="meta">' + dateHtml + amt + reactHtml + '</div>' +
@@ -1014,7 +1032,12 @@
   function renderHistory() {
     var q = $("#histSearch").value.trim().toLowerCase();
     var list = entries.slice().filter(function (e) { return !q || e.name.toLowerCase().indexOf(q) >= 0; });
-    list.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : (b.ts || 0) - (a.ts || 0); });
+    var rank = {}; NUTRIENT_CATS.forEach(function (c, i) { rank[c.key] = i; });
+    var catRank = function (n) { var k = nutrientOf(n).key; return rank[k] != null ? rank[k] : NUTRIENT_CATS.length; };
+    list.sort(function (a, b) {
+      if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return (catRank(a.name) - catRank(b.name)) || ((a.ts || 0) - (b.ts || 0));
+    });
     var cont = $("#histList");
     if (!list.length) {
       cont.innerHTML = '<div class="empty-note"><span class="big">' + (q ? '🔍' : '📝') + '</span>' +
@@ -1027,8 +1050,9 @@
     order.forEach(function (d) {
       html += '<div class="day-group"><div class="dg-date">' + fmtDate(d) +
         '<span class="line"></span><span class="n">' + groups[d].length + '가지</span></div>';
+      html += '<div class="hist-card">';
       groups[d].forEach(function (e) { html += entryCard(e, false); });
-      html += '</div>';
+      html += '</div></div>';
     });
     cont.innerHTML = html;
     bindEntryActions(cont);
@@ -1180,7 +1204,6 @@
     var rv = entry ? (entry.react || "none") : "none";
     $all('input[name="react"]').forEach(function (r) { r.checked = r.value === rv; });
     updateReactStyle();
-    buildDatalist();
     chipsExpanded = false;
     buildQuickChips();
     overlay.classList.add("open");
@@ -1188,10 +1211,6 @@
   }
   function closeSheet() { overlay.classList.remove("open"); }
 
-  function buildDatalist() {
-    var names = {}; entries.forEach(function (e) { names[e.name.trim()] = 1; });
-    $("#ingList").innerHTML = Object.keys(names).map(function (n) { return '<option value="' + esc(n) + '">'; }).join("");
-  }
   var ING_LIBRARY = [
     "쌀", "쌀미음", "오트밀", "현미", "찹쌀", "보리", "수수", "기장", "퀴노아", "밀국수", "감자", "고구마", "옥수수",
     "소고기", "닭고기", "닭안심", "돼지고기", "달걀", "달걀노른자", "달걀흰자", "두부", "완두콩", "병아리콩", "검은콩", "렌틸콩",
@@ -1203,8 +1222,13 @@
   ];
   function buildQuickChips() {
     // user's own ingredients (by frequency) first, then the common library — deduplicated
-    var freq = {}; entries.forEach(function (e) { var k = e.name.trim(); freq[k] = (freq[k] || 0) + 1; });
-    var used = Object.keys(freq).sort(function (a, b) { return freq[b] - freq[a]; });
+    var freq = {}, last = {};
+    entries.forEach(function (e) {
+      var k = e.name.trim();
+      freq[k] = (freq[k] || 0) + 1;
+      if ((e.ts || 0) > (last[k] || 0)) last[k] = e.ts || 0;
+    });
+    var used = Object.keys(freq).sort(function (a, b) { return (freq[b] - freq[a]) || ((last[b] || 0) - (last[a] || 0)); });
     var seen = {}; var all = [];
     used.concat(ING_LIBRARY).forEach(function (n) { var k = n.trim(); if (k && !seen[k]) { seen[k] = 1; all.push(k); } });
     var COLLAPSED = 12;

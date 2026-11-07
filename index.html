@@ -374,6 +374,22 @@
   .plan-add-cell .plan-add { display: block; margin: 0 auto; }
   .plan-add-cell .plan-add + .plan-add { margin-top: 5px; }
   .plan-add.added { background: var(--surface-2); color: var(--accent-ink); border-color: var(--line); opacity: .9; }
+  /* 양 조절 버튼 */
+  .amt-steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 8px; }
+  .amt-step { border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 8px; padding: 8px 0; font-size: .82rem; font-weight: 700; }
+  .amt-step.minus { color: var(--peach); }
+  .amt-step.plus { color: var(--accent-ink); }
+  .amt-step:active { background: var(--accent-soft); }
+  /* 식단표 주차 펼치기/접기 */
+  .plan-tools { display: flex; gap: 6px; flex-wrap: wrap; margin: -6px 0 8px; }
+  .plan-sec.plan-week { margin: 0; padding: 14px 2px; cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; scroll-margin-top: 140px; }
+  .plan-week .pw-title { flex: 1; min-width: 0; }
+  .plan-week .pw-meta { font-size: .74rem; font-weight: 600; color: var(--fg-soft); white-space: nowrap; }
+  .plan-week.now .pw-meta::after { content: " · 이번 주"; color: var(--peach); font-weight: 700; }
+  .plan-week .pw-chev { font-size: 1.3rem; line-height: 1; color: var(--fg-soft); transition: transform .2s; }
+  .plan-week.open .pw-chev { transform: rotate(90deg); }
+  .plan-week:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .plan-body { padding-bottom: 10px; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -527,6 +543,14 @@
             <option value="컵">컵</option>
             <option value="">단위없음</option>
           </select>
+        </div>
+        <div class="amt-steps" id="amtSteps">
+          <button type="button" class="amt-step minus" data-d="-20">-20</button>
+          <button type="button" class="amt-step minus" data-d="-10">-10</button>
+          <button type="button" class="amt-step minus" data-d="-5">-5</button>
+          <button type="button" class="amt-step plus" data-d="5">+5</button>
+          <button type="button" class="amt-step plus" data-d="10">+10</button>
+          <button type="button" class="amt-step plus" data-d="20">+20</button>
         </div>
       </div>
       <div class="field">
@@ -820,16 +844,20 @@
 
   function iconFor(name) {
     var map = [
-      ["쌀|미음|죽|밥|현미", "🍚"], ["오트밀|귀리", "🥣"], ["소고기|쇠고기|한우", "🥩"], ["닭|치킨", "🍗"], ["돼지", "🐷"],
-      ["생선|대구|연어|고등어|멸치", "🐟"], ["계란|달걀|노른자", "🥚"], ["두부|콩", "🫘"],
-      ["애호박|호박", "🎃"], ["당근", "🥕"], ["브로콜리|콜리플라워", "🥦"], ["감자", "🥔"], ["고구마", "🍠"],
-      ["파프리카|피망", "🫑"], ["비트", "🫜"],
-      ["시금치|청경채|배추|양배추|채소|나물|무", "🥬"], ["양파|대파|파", "🧅"], ["버섯", "🍄"],
-      ["토마토", "🍅"], ["옥수수", "🌽"], ["완두|콩", "🫛"], ["오이", "🥒"], ["가지", "🍆"],
+      ["옥수수", "🌽"], ["쌀|미음|죽|밥|현미", "🍚"], ["오트밀|귀리", "🥣"], ["보리|수수|기장|퀴노아", "🌾"], ["국수", "🍜"],
+      ["감자", "🥔"], ["고구마", "🍠"],
+      ["소고기|쇠고기|한우", "🥩"], ["닭|치킨", "🍗"], ["돼지", "🐷"], ["새우", "🦐"], ["게살|꽃게|대게", "🦀"],
+      ["생선|대구|연어|고등어|멸치|가자미|광어", "🐟"], ["계란|달걀|노른자|흰자", "🥚"],
+      ["땅콩", "🥜"], ["콩나물|숙주", "🌱"], ["완두", "🫛"], ["두부|콩|서리태", "🫘"],
+      ["애호박|호박", "🎃"], ["당근", "🥕"], ["브로콜리|콜리플라워", "🥦"],
+      ["파프리카|피망", "🫑"], ["비트", "🫜"], ["연근|우엉|^마$", "🫚"],
+      ["시금치|청경채|배추|양배추|채소|나물|무|케일|아욱|근대|비타민", "🥬"], ["양파|대파|파", "🧅"], ["버섯", "🍄"],
+      ["토마토", "🍅"], ["오이", "🥒"], ["가지", "🍆"],
       ["사과", "🍎"], ["배", "🍐"], ["바나나", "🍌"], ["딸기", "🍓"], ["블루베리", "🫐"],
-      ["귤|오렌지", "🍊"], ["수박", "🍉"], ["포도", "🍇"], ["복숭아|자두", "🍑"], ["망고", "🥭"], ["아보카도", "🥑"],
-      ["분유|모유|우유|요거트|치즈", "🥛"], ["미역|김|해조", "🌿"], ["밤|견과|호두|잣", "🌰"],
-      ["참기름|들기름|기름", "🫗"]
+      ["귤|오렌지", "🍊"], ["수박", "🍉"], ["포도", "🍇"], ["복숭아|자두|살구", "🍑"], ["망고", "🥭"], ["아보카도", "🥑"],
+      ["키위", "🥝"], ["참외|멜론|메론", "🍈"], ["^감$|단감|홍시|곶감", "🟠"],
+      ["치즈", "🧀"], ["분유|모유|우유|요거트", "🥛"], ["미역|김|해조|다시마", "🌿"],
+      ["참기름|들기름|기름", "🫗"], ["밤|견과|호두|잣|깨", "🌰"]
     ];
     for (var i = 0; i < map.length; i++) { if (new RegExp(map[i][0]).test(name)) return map[i][1]; }
     return "🥄";
@@ -837,11 +865,11 @@
 
   // nutrient category classification for the stats tab
   var NUTRIENT_CATS = [
-    { key: "grain",   name: "곡물·탄수화물", ico: "🍚", re: /미음|오트밀|현미|찹쌀|쌀|밥|죽|단호박|감자|고구마|옥수수|국수|빵|시리얼/ },
-    { key: "protein", name: "단백질",       ico: "🥩", re: /소고기|쇠고기|한우|닭|돼지|고기|달걀|계란|노른자|두부|콩|대구|연어|생선|고등어|멸치|새우|게살|해산물/ },
-    { key: "veg",     name: "채소",         ico: "🥦", re: /애호박|호박|당근|브로콜리|청경채|시금치|양배추|배추|비트|양파|파프리카|오이|가지|콜리플라워|버섯|토마토|무|나물|채소|근대|아욱|비타민/ },
-    { key: "fruit",   name: "과일",         ico: "🍎", re: /사과|배|바나나|아보카도|블루베리|딸기|복숭아|망고|자두|귤|오렌지|포도|수박|키위|참외|멜론|메론/ },
-    { key: "etc",     name: "유제품·기타",   ico: "🥛", re: /분유|모유|우유|요거트|치즈|참기름|들기름|기름|미역|김|해조|견과|밤|호두|잣|깨/ }
+    { key: "grain",   name: "곡물·탄수화물", ico: "🍚", re: /미음|오트밀|현미|찹쌀|쌀|밥|죽|감자|고구마|옥수수|국수|빵|시리얼|보리|수수|기장|퀴노아/ },
+    { key: "protein", name: "단백질",       ico: "🥩", re: /소고기|쇠고기|한우|닭|돼지|고기|달걀|계란|노른자|흰자|두부|완두콩|병아리콩|검은콩|검정콩|렌틸콩|강낭콩|서리태|^콩$|대구|연어|생선|고등어|멸치|새우|게살|가자미|광어|해산물/ },
+    { key: "veg",     name: "채소",         ico: "🥦", re: /애호박|단호박|호박|당근|브로콜리|청경채|시금치|양배추|배추|비트|양파|파프리카|오이|가지|콜리플라워|버섯|토마토|무|나물|채소|근대|아욱|비타민|숙주|연근|우엉|케일|^마$/ },
+    { key: "fruit",   name: "과일",         ico: "🍎", re: /사과|배|바나나|아보카도|블루베리|딸기|복숭아|망고|자두|귤|오렌지|포도|수박|키위|참외|멜론|메론|살구|^감$|단감|홍시|곶감/ },
+    { key: "etc",     name: "유제품·기타",   ico: "🥛", re: /분유|모유|우유|요거트|치즈|참기름|들기름|기름|미역|김|해조|견과|밤|호두|잣|깨|땅콩|다시마/ }
   ];
   var CAT_COLOR = { grain: "#e0a94e", protein: "#d9795f", veg: "#6fa85c", fruit: "#cf6f98", etc: "#5f93c4", other: "#9b8e7d" };
   function nutrientOf(name) {
@@ -1165,12 +1193,13 @@
     $("#ingList").innerHTML = Object.keys(names).map(function (n) { return '<option value="' + esc(n) + '">'; }).join("");
   }
   var ING_LIBRARY = [
-    "쌀미음", "오트밀", "현미", "찹쌀", "감자", "고구마", "단호박",
-    "소고기", "닭고기", "돼지고기", "달걀노른자", "두부", "완두콩", "병아리콩",
-    "대구살", "연어", "흰살생선", "멸치", "미역",
-    "애호박", "당근", "브로콜리", "청경채", "시금치", "양배추", "배추", "비트", "양파", "파프리카", "오이", "가지", "콜리플라워", "무", "버섯", "토마토", "옥수수",
-    "사과", "배", "바나나", "아보카도", "블루베리", "딸기", "복숭아", "망고", "자두", "귤",
-    "분유", "참기름", "들기름"
+    "쌀", "쌀미음", "오트밀", "현미", "찹쌀", "보리", "수수", "기장", "퀴노아", "밀국수", "감자", "고구마", "옥수수",
+    "소고기", "닭고기", "닭안심", "돼지고기", "달걀", "달걀노른자", "달걀흰자", "두부", "완두콩", "병아리콩", "검은콩", "렌틸콩",
+    "대구살", "연어", "흰살생선", "가자미", "광어", "고등어", "멸치", "새우살", "게살",
+    "애호박", "단호박", "당근", "브로콜리", "콜리플라워", "청경채", "시금치", "양배추", "적양배추", "배추", "비트", "무",
+    "양파", "파프리카", "오이", "가지", "토마토", "버섯", "표고버섯", "숙주", "콩나물", "연근", "우엉", "마", "아욱", "근대", "케일", "비타민",
+    "사과", "배", "바나나", "아보카도", "블루베리", "딸기", "복숭아", "망고", "자두", "살구", "귤", "키위", "수박", "참외", "멜론", "포도", "감",
+    "분유", "아기치즈", "요거트", "땅콩버터", "참깨", "들깨가루", "호두", "잣", "밤", "미역", "김", "다시마", "참기름", "들기름"
   ];
   function buildQuickChips() {
     // user's own ingredients (by frequency) first, then the common library — deduplicated
@@ -1202,6 +1231,14 @@
     });
   }
   $all('input[name="react"]').forEach(function (r) { r.addEventListener("change", updateReactStyle); });
+  $all("#amtSteps .amt-step").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var inp = $("#fAmount");
+      var v = parseFloat(inp.value);
+      if (isNaN(v)) v = 0;
+      inp.value = Math.max(0, Math.round((v + Number(b.dataset.d)) * 10) / 10);
+    });
+  });
 
   $("#entryForm").addEventListener("submit", function (ev) {
     ev.preventDefault();
@@ -1399,10 +1436,13 @@
   }
   function parsePlanItems(s) {
     if (!s) return [];
-    return String(s).split("+").map(function (t) { return t.trim(); }).filter(Boolean).map(function (t) {
+    return String(s).split(/[+,]/).map(function (t) { return t.trim(); }).filter(Boolean).map(function (t) {
+      var snack = /^간식\s+/.test(t);
+      t = t.replace(/^간식\s+/, "");
       var m = t.match(/^(.*?)\s*([0-9][0-9.~\/]*)\s*(g|ml|스푼|큰술|개|컵)?$/);
-      if (m && m[1].trim()) return { name: m[1].trim(), amount: m[2], unit: m[3] || "" };
-      return { name: t, amount: "", unit: "" };
+      var it = (m && m[1].trim()) ? { name: m[1].trim(), amount: m[2], unit: m[3] || "" } : { name: t, amount: "", unit: "" };
+      it.snack = snack;
+      return it;
     }).filter(function (it) { return it.name; });
   }
   function planMealLabel(h) {
@@ -1494,11 +1534,11 @@
             btn.type = "button"; btn.className = "plan-add"; btn.textContent = base;
             btn.addEventListener("click", function () {
               var defDate = dateFromDay(dayN);
-              var names = mealItems.map(function (i) { return i.name + (i.amount ? " " + i.amount + i.unit : ""); }).join(", ");
+              var names = mealItems.map(function (i) { return (i.snack ? "간식 " : "") + i.name + (i.amount ? " " + i.amount + i.unit : ""); }).join(", ");
               var head = dayN + "일차" + (c.label ? " " + c.label : "") + " · " + names;
               planAddDialog(defDate, head, function (chosen) {
                 var es = mealItems.map(function (it, k) {
-                  return { id: uid(), ts: Date.now() + k, date: chosen, name: it.name, amount: it.amount, unit: it.unit, react: "none", memo: c.label };
+                  return { id: uid(), ts: Date.now() + k, date: chosen, name: it.name, amount: it.amount, unit: it.unit, react: "none", memo: it.snack ? ((c.label ? c.label + " " : "") + "간식") : c.label };
                 });
                 bulkAddEntries(es);
                 planMarkAddedKey(dayN + "|" + c.label, chosen);
@@ -1513,8 +1553,74 @@
         tr.appendChild(td);
       });
     });
+    planMakeCollapsible(sec);
     planEnhanced = true;
     refreshPlanMarks();
+  }
+  function planWeeks() { return $all("#tab-plan h3.plan-week"); }
+  function planSetWeekOpen(h, open) {
+    h.classList.toggle("open", open);
+    h.setAttribute("aria-expanded", open ? "true" : "false");
+    if (h._body) h._body.hidden = !open;
+  }
+  function planTodayDay() {
+    var s = parseYmd(planStartDate()), t = parseYmd(ymd(new Date()));
+    return Math.round((t - s) / 86400000) + 1;
+  }
+  function planCurrentWeek() {
+    var d = planTodayDay(), ws = planWeeks();
+    for (var i = 0; i < ws.length; i++) { if (d >= ws[i]._min && d <= ws[i]._max) return ws[i]; }
+    return null;
+  }
+  function planOpenCurrentWeek(scroll) {
+    var h = planCurrentWeek() || planWeeks()[0]; if (!h) return;
+    planSetWeekOpen(h, true);
+    if (scroll) h.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function planUpdateNowBadge() {
+    var cur = planCurrentWeek();
+    planWeeks().forEach(function (h) { h.classList.toggle("now", h === cur); });
+  }
+  function planMakeCollapsible(sec) {
+    var wrap = sec.querySelector(".plan");
+    if (!wrap || wrap.querySelector(".plan-week")) return;
+    $all("h3.plan-sec", wrap).filter(function (h) { return /주차/.test(h.textContent); }).forEach(function (h) {
+      var body = document.createElement("div"); body.className = "plan-body";
+      var n = h.nextElementSibling;
+      while (n && !(n.tagName === "H3" && n.classList.contains("plan-sec"))) { var nx = n.nextElementSibling; body.appendChild(n); n = nx; }
+      h.parentNode.insertBefore(body, h.nextSibling);
+      var days = [];
+      $all("tbody tr td:first-child", body).forEach(function (td) { var m = td.textContent.match(/^(\d+)일차/); if (m) days.push(+m[1]); });
+      var title = h.textContent;
+      h.textContent = "";
+      h.classList.add("plan-week");
+      h.setAttribute("role", "button"); h.setAttribute("tabindex", "0");
+      var t = document.createElement("span"); t.className = "pw-title"; t.textContent = title;
+      var meta = document.createElement("span"); meta.className = "pw-meta";
+      if (days.length) meta.textContent = Math.min.apply(null, days) + "~" + Math.max.apply(null, days) + "일차";
+      var chev = document.createElement("span"); chev.className = "pw-chev"; chev.setAttribute("aria-hidden", "true"); chev.textContent = "›";
+      h.appendChild(t); h.appendChild(meta); h.appendChild(chev);
+      h._body = body;
+      h._min = days.length ? Math.min.apply(null, days) : 0;
+      h._max = days.length ? Math.max.apply(null, days) : 0;
+      var toggle = function () { planSetWeekOpen(h, body.hidden); };
+      h.addEventListener("click", toggle);
+      h.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    });
+    var tools = document.createElement("div"); tools.className = "plan-tools";
+    tools.innerHTML = '<button type="button" class="btn ghost sm" data-act="open">모두 펼치기</button>' +
+      '<button type="button" class="btn ghost sm" data-act="close">모두 접기</button>' +
+      '<button type="button" class="btn ghost sm" data-act="now">이번 주로</button>';
+    var startCtl = wrap.querySelector(".plan-start");
+    wrap.insertBefore(tools, startCtl ? startCtl.nextSibling : wrap.firstChild);
+    tools.addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b) return;
+      var act = b.dataset.act;
+      if (act === "open" || act === "close") planWeeks().forEach(function (h) { planSetWeekOpen(h, act === "open"); });
+      if (act === "now") planOpenCurrentWeek(true);
+    });
+    planWeeks().forEach(function (h) { planSetWeekOpen(h, false); });
+    planOpenCurrentWeek(false);
   }
   function refreshPlanMarks() {
     if (!planButtons.length) return;
@@ -1528,6 +1634,7 @@
       b.btn.classList.toggle("added", added);
       b.btn.textContent = added ? ("✓ " + (b.label || "담김")) : b.base;
     });
+    planUpdateNowBadge();
   }
 
   // ---- init ----

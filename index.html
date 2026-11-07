@@ -428,6 +428,10 @@
   .hist-card .entry.selected { background: var(--accent-soft); }
   /* 식단표: 새 알레르기 식품 강조 */
   .plan .allergen { font-weight: 800; color: var(--danger); }
+  /* 식단표: 시작일 기준 오늘 행 */
+  .plan-table tbody tr.plan-today td { background: var(--peach-soft); }
+  .plan-table tbody tr.plan-today td:first-child { color: var(--peach); font-weight: 800; }
+  .plan-table tbody tr.plan-today td:first-child::after { content: "오늘"; display: block; font-size: .66rem; font-weight: 700; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1661,7 +1665,7 @@
       $all("tbody tr", tbl).forEach(function (tr) {
         var tds = tr.children; if (!tds.length) return;
         var isDay = parsePlanDate(tds[0].textContent) != null;
-        if (isDay) { planDay++; tds[0].textContent = planDay + "일차"; }
+        if (isDay) { planDay++; tds[0].textContent = planDay + "일차"; tr.dataset.day = planDay; }
         var dayN = planDay;
         var td = document.createElement("td"); td.className = "plan-add-cell";
         if (isDay) {
@@ -1719,6 +1723,8 @@
   function planUpdateNowBadge() {
     var cur = planCurrentWeek();
     planWeeks().forEach(function (h) { h.classList.toggle("now", h === cur); });
+    var today = planTodayDay();
+    $all("#tab-plan tr[data-day]").forEach(function (tr) { tr.classList.toggle("plan-today", +tr.dataset.day === today); });
   }
   function planMakeCollapsible(sec) {
     var wrap = sec.querySelector(".plan");

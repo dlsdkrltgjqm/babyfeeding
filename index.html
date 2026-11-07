@@ -409,6 +409,12 @@
   .hist-card .entry[data-cat="other"]   { box-shadow: inset 3px 0 0 #9b8e7d; }
   .day-group { margin-top: 12px; }
   .day-group > .dg-date { margin-bottom: 6px; }
+  .hist-card .entry + .entry { margin-top: 0; border-top: 1px solid var(--line); }
+  .react-filter { display: flex; gap: 6px; margin: 8px 0 2px; }
+  .react-filter button { border: 1px solid var(--line); background: var(--surface); color: var(--fg-soft); border-radius: 999px; padding: 6px 12px; font-size: .8rem; font-weight: 700; }
+  .react-filter button .n { font-weight: 600; opacity: .75; margin-left: 2px; }
+  .react-filter button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .react-filter button[data-r="bad"][aria-pressed="true"] { background: var(--peach); border-color: var(--peach); }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -453,6 +459,11 @@
       <div class="sec-title">📖 전체 내역</div>
       <div class="filter-row">
         <input type="search" id="histSearch" placeholder="재료 이름으로 검색…">
+      </div>
+      <div class="react-filter" id="reactFilter" role="group" aria-label="반응 필터">
+        <button type="button" data-r="all" aria-pressed="true">전체</button>
+        <button type="button" data-r="ok" aria-pressed="false">😊 양호 <span class="n">0</span></button>
+        <button type="button" data-r="bad" aria-pressed="false">😣 이상 <span class="n">0</span></button>
       </div>
       <div id="histList"></div>
     </section>
@@ -890,6 +901,11 @@
     { key: "etc",     name: "유제품·기타",   ico: "🥛", re: /분유|모유|우유|요거트|치즈|참기름|들기름|기름|미역|김|해조|견과|밤|호두|잣|깨|땅콩|다시마/ }
   ];
   var CAT_COLOR = { grain: "#e0a94e", protein: "#d9795f", veg: "#6fa85c", fruit: "#cf6f98", etc: "#5f93c4", other: "#9b8e7d" };
+  function catRank(name) {
+    var k = nutrientOf(name).key;
+    for (var i = 0; i < NUTRIENT_CATS.length; i++) { if (NUTRIENT_CATS[i].key === k) return i; }
+    return NUTRIENT_CATS.length;
+  }
   function nutrientOf(name) {
     for (var i = 0; i < NUTRIENT_CATS.length; i++) { if (NUTRIENT_CATS[i].re.test(name)) return NUTRIENT_CATS[i]; }
     return { key: "other", name: "기타", ico: "🥄" };
@@ -976,7 +992,9 @@
 
   function renderDayPanel() {
     var panel = $("#dayPanel");
-    var list = entriesOn(selectedDay).slice().sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); });
+    var list = entriesOn(selectedDay).slice().sort(function (a, b) {
+      return (catRank(a.name) - catRank(b.name)) || ((a.ts || 0) - (b.ts || 0));
+    });
     var html = '<div class="day-panel"><div class="dp-head">' +
       '<div><h3>' + fmtDate(selectedDay) + '</h3><div class="sum">' +
       (list.length ? list.length + '가지 재료' : '기록 없음') + '</div></div>' +
@@ -984,7 +1002,9 @@
     if (!list.length) {
       html += '<div class="empty-note"><span class="big">🍽️</span>아직 기록이 없어요.<br>오늘 먹은 이유식을 추가해 보세요!</div>';
     } else {
+      html += '<div class="hist-card">';
       list.forEach(function (e) { html += entryCard(e, false); });
+      html += '</div>';
     }
     html += '</div></div>';
     panel.innerHTML = html;
@@ -1031,17 +1051,22 @@
   // ===================== HISTORY =====================
   function renderHistory() {
     var q = $("#histSearch").value.trim().toLowerCase();
-    var list = entries.slice().filter(function (e) { return !q || e.name.toLowerCase().indexOf(q) >= 0; });
-    var rank = {}; NUTRIENT_CATS.forEach(function (c, i) { rank[c.key] = i; });
-    var catRank = function (n) { var k = nutrientOf(n).key; return rank[k] != null ? rank[k] : NUTRIENT_CATS.length; };
+    var okN = 0, badN = 0;
+    entries.forEach(function (e) { if (e.react === "ok") okN++; else if (e.react === "bad") badN++; });
+    $('#reactFilter [data-r="ok"] .n').textContent = okN;
+    $('#reactFilter [data-r="bad"] .n').textContent = badN;
+    var rf = histReact || "all";
+    var list = entries.slice().filter(function (e) {
+      return (!q || e.name.toLowerCase().indexOf(q) >= 0) && (rf === "all" || e.react === rf);
+    });
     list.sort(function (a, b) {
       if (a.date !== b.date) return a.date < b.date ? 1 : -1;
       return (catRank(a.name) - catRank(b.name)) || ((a.ts || 0) - (b.ts || 0));
     });
     var cont = $("#histList");
     if (!list.length) {
-      cont.innerHTML = '<div class="empty-note"><span class="big">' + (q ? '🔍' : '📝') + '</span>' +
-        (q ? '검색 결과가 없어요.' : '아직 기록이 없어요.<br>캘린더에서 첫 기록을 추가해 보세요!') + '</div>';
+      cont.innerHTML = '<div class="empty-note"><span class="big">' + ((q || rf !== "all") ? '🔍' : '📝') + '</span>' +
+        ((q || rf !== "all") ? '조건에 맞는 기록이 없어요.' : '아직 기록이 없어요.<br>캘린더에서 첫 기록을 추가해 보세요!') + '</div>';
       return;
     }
     var groups = {}; var order = [];
@@ -1058,6 +1083,14 @@
     bindEntryActions(cont);
   }
   $("#histSearch").addEventListener("input", renderHistory);
+  var histReact = "all";
+  $all("#reactFilter button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      histReact = b.dataset.r;
+      $all("#reactFilter button").forEach(function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
+      renderHistory();
+    });
+  });
 
   // ===================== STATS =====================
   var statMode = "week";

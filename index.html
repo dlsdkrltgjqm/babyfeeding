@@ -415,6 +415,17 @@
   .react-filter button .n { font-weight: 600; opacity: .75; margin-left: 2px; }
   .react-filter button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
   .react-filter button[data-r="bad"][aria-pressed="true"] { background: var(--peach); border-color: var(--peach); }
+  /* 캘린더 날짜 목록: 체크박스 + 일괄 작업 */
+  .bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .bulk-all { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; font-weight: 700; color: var(--fg); cursor: pointer; }
+  .bulk-n { flex: 1; font-size: .76rem; color: var(--fg-soft); text-align: right; }
+  .bulk-acts { flex-basis: 100%; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .bulk-btn { border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); border-radius: 8px; padding: 7px 2px; font-size: .78rem; font-weight: 700; }
+  .bulk-btn.del { color: var(--danger); }
+  .bulk-btn:disabled { opacity: .4; cursor: default; }
+  .entry .sel { display: flex; align-items: center; align-self: stretch; padding: 0 4px 0 0; cursor: pointer; }
+  .sel-cb, .bulk-all input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+  .hist-card .entry.selected { background: var(--accent-soft); }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -990,6 +1001,26 @@
     renderDayPanel();
   }
 
+  var daySel = {}, daySelDay = null;
+  function setEntryReact(id, r) {
+    if (typeof updateEntry === "function") { updateEntry(id, { react: r }); return; }
+    var ex = entries.find(function (x) { return x.id === id; });
+    if (ex) upsertEntry(Object.assign({}, ex, { react: r }));
+  }
+  function dayBulkAction(act) {
+    var ids = Object.keys(daySel); if (!ids.length) return;
+    if (act === "del") {
+      confirmDialog("선택한 " + ids.length + "개 기록을 삭제할까요?", function () {
+        daySel = {};
+        ids.forEach(function (id) { deleteEntryById(id); });
+        toast(ids.length + "개 삭제했어요");
+      });
+      return;
+    }
+    daySel = {};
+    ids.forEach(function (id) { setEntryReact(id, act); });
+    toast(ids.length + "개를 " + ({ ok: "😊 양호로", bad: "😣 이상으로", none: "반응 없음으로" })[act] + " 바꿨어요");
+  }
   function renderDayPanel() {
     var panel = $("#dayPanel");
     var list = entriesOn(selectedDay).slice().sort(function (a, b) {
@@ -1002,22 +1033,71 @@
     if (!list.length) {
       html += '<div class="empty-note"><span class="big">🍽️</span>아직 기록이 없어요.<br>오늘 먹은 이유식을 추가해 보세요!</div>';
     } else {
+      html += '<div class="bulk-bar">' +
+        '<label class="bulk-all"><input type="checkbox" id="selAll"> 전체 선택</label>' +
+        '<span class="bulk-n" id="selN"></span>' +
+        '<div class="bulk-acts">' +
+          '<button type="button" class="bulk-btn" data-act="ok">😊 양호</button>' +
+          '<button type="button" class="bulk-btn" data-act="bad">😣 이상</button>' +
+          '<button type="button" class="bulk-btn" data-act="none">반응 지우기</button>' +
+          '<button type="button" class="bulk-btn del" data-act="del">🗑️ 삭제</button>' +
+        '</div></div>';
       html += '<div class="hist-card">';
-      list.forEach(function (e) { html += entryCard(e, false); });
+      list.forEach(function (e) { html += entryCard(e, false, true); });
       html += '</div>';
     }
     html += '</div></div>';
     panel.innerHTML = html;
     $("#addBtn").addEventListener("click", function () { openSheet(null, selectedDay); });
     bindEntryActions(panel);
+    if (!list.length) return;
+
+    if (daySelDay !== selectedDay) { daySel = {}; daySelDay = selectedDay; }
+    var present = {}; list.forEach(function (e) { present[e.id] = 1; });
+    Object.keys(daySel).forEach(function (id) { if (!present[id]) delete daySel[id]; });
+
+    var cbs = $all(".sel-cb", panel);
+    var syncBar = function () {
+      var n = Object.keys(daySel).length;
+      $("#selN").textContent = n ? n + "개 선택됨" : "선택해서 한 번에 바꾸기";
+      $all(".bulk-btn", panel).forEach(function (b) { b.disabled = !n; });
+      var all = $("#selAll");
+      all.checked = n > 0 && n === list.length;
+      all.indeterminate = n > 0 && n < list.length;
+    };
+    cbs.forEach(function (cb) {
+      var row = cb.closest(".entry");
+      cb.checked = !!daySel[row.dataset.id];
+      row.classList.toggle("selected", cb.checked);
+      cb.addEventListener("change", function () {
+        if (cb.checked) daySel[row.dataset.id] = 1; else delete daySel[row.dataset.id];
+        row.classList.toggle("selected", cb.checked);
+        syncBar();
+      });
+    });
+    $("#selAll").addEventListener("change", function () {
+      var on = this.checked;
+      daySel = {};
+      cbs.forEach(function (cb) {
+        var row = cb.closest(".entry");
+        cb.checked = on; row.classList.toggle("selected", on);
+        if (on) daySel[row.dataset.id] = 1;
+      });
+      syncBar();
+    });
+    $all(".bulk-btn", panel).forEach(function (b) {
+      b.addEventListener("click", function () { dayBulkAction(b.dataset.act); });
+    });
+    syncBar();
   }
 
-  function entryCard(e, showDate) {
+  function entryCard(e, showDate, selectable) {
     var reactHtml = e.react === "ok" ? '<span class="react ok">😊 양호</span>' :
                     e.react === "bad" ? '<span class="react bad">😣 이상</span>' : '';
     var amt = (e.amount !== "" && e.amount != null) ? '<span class="amt-badge">' + esc(e.amount) + (e.unit ? esc(e.unit) : '') + '</span>' : '';
     var dateHtml = showDate ? '<span>' + fmtDate(e.date) + '</span>' : '';
     return '<div class="entry" data-id="' + e.id + '" data-cat="' + nutrientOf(e.name).key + '">' +
+      (selectable ? '<label class="sel"><input type="checkbox" class="sel-cb" aria-label="' + esc(e.name) + ' 선택"></label>' : '') +
       '<span class="ing-ico">' + iconFor(e.name) + '</span>' +
       '<div class="body"><div class="name">' + esc(e.name) + '</div>' +
       '<div class="meta">' + dateHtml + amt + reactHtml + '</div>' +
@@ -1641,7 +1721,7 @@
   function planMakeCollapsible(sec) {
     var wrap = sec.querySelector(".plan");
     if (!wrap || wrap.querySelector(".plan-week")) return;
-    $all("h3.plan-sec", wrap).filter(function (h) { return /주차/.test(h.textContent); }).forEach(function (h) {
+    $all("h3.plan-sec", wrap).forEach(function (h) {
       var body = document.createElement("div"); body.className = "plan-body";
       var n = h.nextElementSibling;
       while (n && !(n.tagName === "H3" && n.classList.contains("plan-sec"))) { var nx = n.nextElementSibling; body.appendChild(n); n = nx; }

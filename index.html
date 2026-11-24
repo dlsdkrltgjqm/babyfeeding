@@ -219,6 +219,52 @@
   .empty-note { text-align: center; color: var(--fg-soft); font-size: .86rem; padding: 18px 8px; }
   .empty-note .big { font-size: 1.8rem; display: block; margin-bottom: 6px; }
 
+  /* Inventory (calendar tab) */
+  .inv-wrap { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+  .inv-head { display: flex; align-items: center; gap: 9px; padding: 13px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; }
+  .inv-head.collapsed { border-bottom: none; }
+  .inv-head .chev { color: var(--fg-soft); font-size: .72rem; transition: transform .2s; }
+  .inv-head.collapsed .chev { transform: rotate(-90deg); }
+  .inv-head h3 { font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+  .inv-head .inv-sum { margin-left: auto; font-size: .76rem; color: var(--fg-soft); font-weight: 600; }
+  .inv-head .inv-add { flex-shrink: 0; }
+  .inv-body { padding: 10px 14px 14px; }
+  .inv-group { margin-top: 13px; }
+  .inv-group:first-child { margin-top: 2px; }
+  .inv-group > .ig-title { font-size: .78rem; font-weight: 700; color: var(--fg-soft); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .inv-card { border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+  .inv-row { display: flex; align-items: center; gap: 9px; padding: 8px 10px 8px 12px; }
+  .inv-row + .inv-row { border-top: 1px solid var(--line); }
+  .inv-row .ing-ico { font-size: 1.1rem; flex-shrink: 0; }
+  .inv-row .nm { flex: 1; min-width: 0; font-weight: 700; font-size: .92rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inv-row[data-cat="grain"]   { box-shadow: inset 3px 0 0 #e0a94e; }
+  .inv-row[data-cat="protein"] { box-shadow: inset 3px 0 0 #d9795f; }
+  .inv-row[data-cat="veg"]     { box-shadow: inset 3px 0 0 #6fa85c; }
+  .inv-row[data-cat="fruit"]   { box-shadow: inset 3px 0 0 #cf6f98; }
+  .inv-row[data-cat="etc"]     { box-shadow: inset 3px 0 0 #5f93c4; }
+  .inv-row[data-cat="other"]   { box-shadow: inset 3px 0 0 #9b8e7d; }
+  .inv-stepper { display: flex; align-items: center; flex-shrink: 0; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
+  .inv-stepper button { width: 32px; height: 32px; border: none; background: var(--surface-2); color: var(--fg); font-size: 1.1rem; font-weight: 700; line-height: 1; }
+  .inv-stepper button:active { background: var(--accent-soft); }
+  .inv-stepper button:disabled { opacity: .4; }
+  .inv-qty { min-width: 62px; text-align: center; font-weight: 700; font-size: .9rem; padding: 0 4px; cursor: pointer; }
+  .inv-qty .u { font-size: .72rem; color: var(--fg-soft); font-weight: 600; margin-left: 1px; }
+  .inv-qty.zero { color: var(--danger); }
+  .inv-del { width: 30px; height: 30px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--fg-soft); font-size: .8rem; }
+  .inv-del:active { color: var(--danger); border-color: var(--danger); }
+  .inv-empty { text-align: center; color: var(--fg-soft); font-size: .84rem; padding: 16px 8px; }
+  .inv-form { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 4px; }
+  .inv-form input[type=text], .inv-form input[type=number] { padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--fg); font-size: .9rem; }
+  .inv-form .f-name { width: 100%; box-sizing: border-box; }
+  .inv-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .inv-cats button { border: 1px solid var(--line); background: var(--surface); color: var(--fg-soft); border-radius: 999px; padding: 6px 11px; font-size: .82rem; font-weight: 600; }
+  .inv-cats button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .inv-form .f-row { display: flex; gap: 8px; margin-top: 8px; }
+  .inv-form .f-amt { flex: 1; min-width: 0; }
+  .inv-form .f-unit { width: 74px; }
+  .inv-form .f-actions { display: flex; gap: 8px; margin-top: 10px; }
+  .inv-form .f-actions .btn { flex: 1; }
+
   /* History */
   .sec-title { font-size: 1.1rem; font-weight: 700; margin: 16px 0 6px; display: flex; align-items: center; gap: 7px; }
   .filter-row { display: flex; gap: 8px; margin-bottom: 4px; }
@@ -480,6 +526,7 @@
       </div>
       <div class="cal-grid" id="calGrid"></div>
       <div id="dayPanel"></div>
+      <div id="invSection"></div>
     </section>
 
     <!-- HISTORY -->
@@ -948,14 +995,14 @@
 
   function iconFor(name) {
     var map = [
-      ["옥수수", "🌽"], ["쌀|미음|죽|밥|현미|흑미", "🍚"], ["오트밀|귀리", "🥣"], ["보리|수수|기장|퀴노아|메밀|밀가루|^밀$", "🌾"], ["국수", "🍜"],
+      ["옥수수", "🌽"], ["쌀|미음|죽|밥|현미|흑미", "🍚"], ["오트밀|귀리", "🥣"], ["보리|수수|기장|퀴노아|메밀|밀가루|잡곡|곡물|^밀$", "🌾"], ["국수", "🍜"],
       ["감자", "🥔"], ["고구마", "🍠"],
       ["소고기|쇠고기|한우", "🥩"], ["닭|치킨", "🍗"], ["돼지", "🐷"], ["새우", "🦐"], ["게살|꽃게|대게|^게$", "🦀"], ["바지락|조개", "🦪"], ["오징어", "🦑"],
-      ["생선|대구|연어|고등어|멸치|가자미|광어", "🐟"], ["계란|달걀|노른자|흰자", "🥚"],
+      ["생선|대구|연어|고등어|멸치|가자미|광어", "🐟"], ["계란|달걀|노른자|흰자", "🥚"], ["고기|육류", "🍖"],
       ["땅콩", "🥜"], ["콩나물|숙주", "🌱"], ["완두", "🫛"], ["두부|콩|서리태", "🫘"],
       ["애호박|호박", "🎃"], ["당근", "🥕"], ["브로콜리|콜리플라워", "🥦"],
       ["파프리카|피망", "🫑"], ["비트", "🫜"], ["연근|우엉|^마$", "🫚"],
-      ["시금치|청경채|배추|양배추|채소|나물|무|케일|아욱|근대|비타민|부추", "🥬"], ["마늘", "🧄"], ["양파|대파|파", "🧅"], ["버섯", "🍄"],
+      ["시금치|청경채|배추|양배추|채소|야채|나물|무|케일|아욱|근대|비타민|부추", "🥬"], ["마늘", "🧄"], ["양파|대파|파", "🧅"], ["버섯", "🍄"],
       ["토마토", "🍅"], ["오이", "🥒"], ["가지", "🍆"],
       ["사과", "🍎"], ["배", "🍐"], ["바나나", "🍌"], ["딸기", "🍓"], ["블루베리", "🫐"],
       ["귤|오렌지", "🍊"], ["수박", "🍉"], ["포도", "🍇"], ["복숭아|자두|살구", "🍑"], ["망고", "🥭"], ["아보카도", "🥑"],
@@ -1839,8 +1886,178 @@
     planUpdateNowBadge();
   }
 
+  // ---- inventory (calendar tab) ----
+  var INV_STORE = "babyfood.inventory.v1";
+  var INV_OPEN = "babyfood.invOpen.v1";
+  var inventory = (function () {
+    try { var a = JSON.parse(localStorage.getItem(INV_STORE) || "[]"); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+  })();
+  function invSave() { try { localStorage.setItem(INV_STORE, JSON.stringify(inventory)); } catch (e) {} }
+  var invFormOpen = false, invFormId = null, invFormCat = null, invFormCatManual = false;
+  var INV_CATS = [
+    { key: "grain",   name: "곡물",   ico: "🍚" },
+    { key: "protein", name: "단백질", ico: "🥩" },
+    { key: "veg",     name: "채소",   ico: "🥦" },
+    { key: "fruit",   name: "과일",   ico: "🍎" },
+    { key: "etc",     name: "기타",   ico: "🥛" }
+  ];
+  function invCatOf(name) {
+    if (/잡곡|곡물|쌀|밥|죽|면|국수|감자|고구마|빵|떡/.test(name)) return "grain";
+    if (/야채|채소/.test(name)) return "veg";
+    if (/고기|육류/.test(name)) return "protein";
+    if (/과일/.test(name)) return "fruit";
+    var k = nutrientOf(name).key;
+    return k === "other" ? "etc" : k;
+  }
+  function invStep(it) { return (it.unit && /개|팩|컵|큐브|통|봉|알|쪽|조각/.test(it.unit)) ? 1 : 10; }
+  function invFmtAmt(it) {
+    var a = (it.amount == null || it.amount === "") ? 0 : it.amount;
+    return a + (it.unit ? '<span class="u">' + esc(it.unit) + '</span>' : '');
+  }
+  function invFormHtml() {
+    var it = invFormId ? inventory.find(function (x) { return x.id === invFormId; }) : null;
+    var cat = invFormCat || (it ? (it.cat || invCatOf(it.name)) : null);
+    var cats = INV_CATS.map(function (c) {
+      return '<button type="button" data-cat="' + c.key + '" aria-pressed="' + (c.key === cat ? 'true' : 'false') + '">' + c.ico + ' ' + c.name + '</button>';
+    }).join('');
+    return '<div class="inv-form">' +
+      '<input type="text" class="f-name" id="invName" placeholder="재료 이름 (예: 쌀, 소고기, 애호박)" value="' + (it ? esc(it.name) : '') + '">' +
+      '<div class="inv-cats" id="invCats">' + cats + '</div>' +
+      '<div class="f-row">' +
+        '<input type="number" class="f-amt" id="invAmt" inputmode="decimal" placeholder="수량" value="' + (it && it.amount != null ? esc(it.amount) : '') + '">' +
+        '<input type="text" class="f-unit" id="invUnit" placeholder="단위" value="' + (it ? esc(it.unit || '') : 'g') + '">' +
+      '</div>' +
+      '<div class="f-actions"><button type="button" class="btn ghost" id="invCancel">취소</button>' +
+      '<button type="button" class="btn" id="invSaveBtn">' + (it ? '수정' : '추가') + '</button></div></div>';
+  }
+  function renderInventory() {
+    var sec = $("#invSection"); if (!sec) return;
+    var open; try { open = localStorage.getItem(INV_OPEN); } catch (e) {}
+    var collapsed = open === "0";
+    var n = inventory.length;
+    var low = inventory.filter(function (x) { return !x.amount || Number(x.amount) <= 0; }).length;
+    var sum = n ? (n + '가지' + (low ? ' · ' + low + '가지 떨어짐' : '')) : '';
+    var html = '<div class="inv-wrap"><div class="inv-head' + (collapsed ? ' collapsed' : '') + '" id="invHead">' +
+      '<span class="chev">▼</span><h3>🧺 재고 관리</h3>' +
+      '<span class="inv-sum">' + sum + '</span>' +
+      '<button type="button" class="btn sm inv-add" id="invAddBtn">+ 추가</button></div>';
+    if (!collapsed) {
+      html += '<div class="inv-body">';
+      if (invFormOpen) html += invFormHtml();
+      if (!n && !invFormOpen) {
+        html += '<div class="inv-empty">아직 등록한 재고가 없어요.<br>‘+ 추가’로 쌀·고기·채소 재고를 적어 두세요.</div>';
+      } else {
+        INV_CATS.forEach(function (c) {
+          var items = inventory.filter(function (x) { return (x.cat || invCatOf(x.name)) === c.key; })
+            .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ko'); });
+          if (!items.length) return;
+          html += '<div class="inv-group"><div class="ig-title">' + c.ico + ' ' + c.name + '</div><div class="inv-card">';
+          items.forEach(function (it) {
+            var cat = it.cat || invCatOf(it.name);
+            var zero = (!it.amount || Number(it.amount) <= 0);
+            html += '<div class="inv-row" data-cat="' + cat + '" data-id="' + it.id + '">' +
+              '<span class="ing-ico">' + iconFor(it.name) + '</span>' +
+              '<span class="nm">' + esc(it.name) + '</span>' +
+              '<div class="inv-stepper"><button type="button" class="inv-dec" aria-label="줄이기">−</button>' +
+              '<span class="inv-qty' + (zero ? ' zero' : '') + '" role="button" tabindex="0" title="눌러서 수정">' + (zero ? '없음' : invFmtAmt(it)) + '</span>' +
+              '<button type="button" class="inv-inc" aria-label="늘리기">+</button></div>' +
+              '<button type="button" class="inv-del" aria-label="삭제">🗑️</button></div>';
+          });
+          html += '</div></div>';
+        });
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    sec.innerHTML = html;
+    bindInventory(sec);
+  }
+  function invHighlightCats(root) {
+    $all("#invCats button", root).forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.cat === invFormCat ? "true" : "false"); });
+  }
+  function invAdjust(id, delta) {
+    var it = inventory.find(function (x) { return x.id === id; }); if (!it) return;
+    var cur = Number(it.amount) || 0;
+    var next = Math.round((cur + delta) * 100) / 100;
+    if (next < 0) next = 0;
+    it.amount = next; it.ts = Date.now();
+    invSave(); renderInventory();
+  }
+  function invFormSave() {
+    var nameEl = $("#invName"); if (!nameEl) return;
+    var name = (nameEl.value || "").trim();
+    if (!name) { toast("재료 이름을 적어 주세요"); nameEl.focus(); return; }
+    var amtRaw = ($("#invAmt").value || "").trim();
+    var amount = amtRaw === "" ? 0 : Number(amtRaw);
+    if (isNaN(amount) || amount < 0) amount = 0;
+    var unit = ($("#invUnit").value || "").trim();
+    var cat = invFormCat || invCatOf(name);
+    if (invFormId) {
+      var it = inventory.find(function (x) { return x.id === invFormId; });
+      if (it) { it.name = name; it.amount = amount; it.unit = unit; it.cat = cat; it.ts = Date.now(); }
+    } else {
+      inventory.push({ id: "inv" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name, amount: amount, unit: unit, cat: cat, ts: Date.now() });
+    }
+    invSave();
+    invFormOpen = false; invFormId = null; invFormCatManual = false;
+    toast("저장했어요");
+    renderInventory();
+  }
+  function bindInventory(root) {
+    var head = $("#invHead", root);
+    if (head) head.addEventListener("click", function (e) {
+      if (e.target.closest("#invAddBtn")) return;
+      var collapsed = head.classList.contains("collapsed");
+      try { localStorage.setItem(INV_OPEN, collapsed ? "1" : "0"); } catch (x) {}
+      renderInventory();
+    });
+    var addBtn = $("#invAddBtn", root);
+    if (addBtn) addBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      try { localStorage.setItem(INV_OPEN, "1"); } catch (x) {}
+      invFormOpen = true; invFormId = null; invFormCat = null; invFormCatManual = false;
+      renderInventory();
+      setTimeout(function () { var el = $("#invName"); if (el) el.focus(); }, 60);
+    });
+    var nameEl = $("#invName", root);
+    if (nameEl) nameEl.addEventListener("input", function () {
+      if (!invFormCatManual) { invFormCat = nameEl.value.trim() ? invCatOf(nameEl.value) : null; invHighlightCats(root); }
+    });
+    $all("#invCats button", root).forEach(function (b) {
+      b.addEventListener("click", function () { invFormCat = b.dataset.cat; invFormCatManual = true; invHighlightCats(root); });
+    });
+    var cancel = $("#invCancel", root);
+    if (cancel) cancel.addEventListener("click", function () { invFormOpen = false; invFormId = null; invFormCatManual = false; renderInventory(); });
+    var saveBtn = $("#invSaveBtn", root);
+    if (saveBtn) saveBtn.addEventListener("click", invFormSave);
+    $all(".inv-row", root).forEach(function (row) {
+      var id = row.dataset.id;
+      var it = inventory.find(function (x) { return x.id === id; });
+      if (!it) return;
+      $(".inv-inc", row).addEventListener("click", function () { invAdjust(id, invStep(it)); });
+      $(".inv-dec", row).addEventListener("click", function () { invAdjust(id, -invStep(it)); });
+      var qty = $(".inv-qty", row);
+      var editIt = function () {
+        try { localStorage.setItem(INV_OPEN, "1"); } catch (x) {}
+        invFormOpen = true; invFormId = id; invFormCat = it.cat || invCatOf(it.name); invFormCatManual = true;
+        renderInventory();
+        setTimeout(function () { var el = $("#invAmt"); if (el) { el.focus(); el.select(); } }, 60);
+      };
+      qty.addEventListener("click", editIt);
+      qty.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); editIt(); } });
+      $(".inv-del", row).addEventListener("click", function () {
+        confirmDialog("‘" + it.name + "’ 재고를 삭제할까요?", function () {
+          inventory = inventory.filter(function (x) { return x.id !== id; });
+          invSave(); toast("삭제했어요"); renderInventory();
+        });
+      });
+    });
+  }
+
   // ---- init ----
   initTheme();
+  renderInventory();
   entries = load();        // instant paint from the local cache
   renderCalendar();
   initServer();            // connect to the NAS (PocketBase) and poll for changes

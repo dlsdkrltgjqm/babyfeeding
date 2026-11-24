@@ -257,14 +257,14 @@
   .inv-opt input { margin-top: 2px; flex-shrink: 0; width: 17px; height: 17px; accent-color: var(--accent); }
   .inv-opt .hint { font-size: .74rem; color: var(--fg-soft); font-weight: 400; line-height: 1.35; }
   .inv-form { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 4px; }
-  .inv-form input[type=text], .inv-form input[type=number] { padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--fg); font-size: .9rem; }
+  .inv-form input[type=text], .inv-form input[type=number], .inv-form select { padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--fg); font-size: .9rem; }
   .inv-form .f-name { width: 100%; box-sizing: border-box; }
-  .inv-cats, .inv-units { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .inv-cats button, .inv-units button { border: 1px solid var(--line); background: var(--surface); color: var(--fg-soft); border-radius: 999px; padding: 6px 11px; font-size: .82rem; font-weight: 600; }
-  .inv-cats button[aria-pressed="true"], .inv-units button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .inv-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .inv-cats button { border: 1px solid var(--line); background: var(--surface); color: var(--fg-soft); border-radius: 999px; padding: 6px 11px; font-size: .82rem; font-weight: 600; }
+  .inv-cats button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
   .inv-form .f-row { display: flex; gap: 8px; margin-top: 8px; }
   .inv-form .f-amt { flex: 1; min-width: 0; }
-  .inv-form .f-unit { width: 74px; }
+  .inv-form .f-unit { width: 96px; flex-shrink: 0; }
   .inv-form .f-actions { display: flex; gap: 8px; margin-top: 10px; }
   .inv-form .f-actions .btn { flex: 1; }
 
@@ -1975,15 +1975,15 @@
     { key: "etc",     name: "기타",   ico: "🥛" }
   ];
   var INV_UNITS = ["g", "큐브", "개", "ml", "컵", "팩", "조각"];
-  function invUnitChips(cur) {
+  function invUnitOptions(cur) {
     cur = (cur == null ? "" : String(cur)).trim();
-    return INV_UNITS.map(function (u) {
-      return '<button type="button" data-unit="' + esc(u) + '" aria-pressed="' + (u === cur ? 'true' : 'false') + '">' + esc(u) + '</button>';
+    var opts = INV_UNITS.slice();
+    if (cur && opts.indexOf(cur) < 0) opts.unshift(cur);   // keep an existing custom unit selectable
+    var html = opts.map(function (u) {
+      return '<option value="' + esc(u) + '"' + (u === cur ? ' selected' : '') + '>' + esc(u) + '</option>';
     }).join('');
-  }
-  function invHighlightUnits(root) {
-    var cur = (($("#invUnit", root) || {}).value || "").trim();
-    $all("#invUnits button", root).forEach(function (b) { b.setAttribute("aria-pressed", b.dataset.unit === cur ? "true" : "false"); });
+    html += '<option value=""' + (cur === "" ? ' selected' : '') + '>단위없음</option>';
+    return html;
   }
   function invCatOf(name) {
     if (/잡곡|곡물|쌀|밥|죽|면|국수|감자|고구마|빵|떡/.test(name)) return "grain";
@@ -2009,9 +2009,16 @@
       '<div class="inv-cats" id="invCats">' + cats + '</div>' +
       '<div class="f-row">' +
         '<input type="number" class="f-amt" id="invAmt" inputmode="decimal" placeholder="수량" value="' + (it && it.amount != null ? esc(it.amount) : '') + '">' +
-        '<input type="text" class="f-unit" id="invUnit" placeholder="단위" value="' + (it ? esc(it.unit || '') : 'g') + '">' +
+        '<select class="f-unit" id="invUnit">' + invUnitOptions(it ? (it.unit || '') : 'g') + '</select>' +
       '</div>' +
-      '<div class="inv-units" id="invUnits">' + invUnitChips(it ? (it.unit || '') : 'g') + '</div>' +
+      '<div class="amt-steps" id="invAmtSteps">' +
+        '<button type="button" class="amt-step minus" data-d="-500">-500</button>' +
+        '<button type="button" class="amt-step minus" data-d="-10">-10</button>' +
+        '<button type="button" class="amt-step minus" data-d="-5">-5</button>' +
+        '<button type="button" class="amt-step plus" data-d="5">+5</button>' +
+        '<button type="button" class="amt-step plus" data-d="10">+10</button>' +
+        '<button type="button" class="amt-step plus" data-d="500">+500</button>' +
+      '</div>' +
       '<div class="f-actions"><button type="button" class="btn ghost" id="invCancel">취소</button>' +
       '<button type="button" class="btn" id="invSaveBtn">' + (it ? '수정' : '추가') + '</button></div></div>';
   }
@@ -2164,10 +2171,12 @@
     $all("#invCats button", root).forEach(function (b) {
       b.addEventListener("click", function () { invFormCat = b.dataset.cat; invFormCatManual = true; invHighlightCats(root); });
     });
-    var unitEl = $("#invUnit", root);
-    if (unitEl) unitEl.addEventListener("input", function () { invHighlightUnits(root); });
-    $all("#invUnits button", root).forEach(function (b) {
-      b.addEventListener("click", function () { if (unitEl) { unitEl.value = b.dataset.unit; } invHighlightUnits(root); });
+    $all("#invAmtSteps .amt-step", root).forEach(function (b) {
+      b.addEventListener("click", function () {
+        var inp = $("#invAmt", root); if (!inp) return;
+        var v = parseFloat(inp.value); if (isNaN(v)) v = 0;
+        inp.value = Math.max(0, Math.round((v + Number(b.dataset.d)) * 100) / 100);
+      });
     });
     var cancel = $("#invCancel", root);
     if (cancel) cancel.addEventListener("click", function () { invFormOpen = false; invFormId = null; invFormCatManual = false; renderInventory(); });

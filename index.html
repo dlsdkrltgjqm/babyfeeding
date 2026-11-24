@@ -253,6 +253,9 @@
   .inv-del { width: 30px; height: 30px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--fg-soft); font-size: .8rem; }
   .inv-del:active { color: var(--danger); border-color: var(--danger); }
   .inv-empty { text-align: center; color: var(--fg-soft); font-size: .84rem; padding: 16px 8px; }
+  .inv-opt { display: flex; align-items: flex-start; gap: 9px; padding: 10px 11px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: .86rem; cursor: pointer; }
+  .inv-opt input { margin-top: 2px; flex-shrink: 0; width: 17px; height: 17px; accent-color: var(--accent); }
+  .inv-opt .hint { font-size: .74rem; color: var(--fg-soft); font-weight: 400; line-height: 1.35; }
   .inv-form { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 4px; }
   .inv-form input[type=text], .inv-form input[type=number] { padding: 10px 11px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--fg); font-size: .9rem; }
   .inv-form .f-name { width: 100%; box-sizing: border-box; }
@@ -963,16 +966,83 @@
     }
   }
 
+  // ---- inventory sync (NAS mode): a mirror of the entries layer above ----
+  // Stock is stored in a PocketBase `inventory` collection so it is shared across
+  // devices. The on/off toggle for auto-deduct stays per-device (localStorage).
+  var INV_RECORDS = API_BASE + "/api/collections/inventory/records";
+  var invRefreshing = false;
+  var invSyncReady = false;   // true once the `inventory` collection answers (exists on the NAS)
+  function invRec2item(r) {
+    return {
+      id: r.id,
+      name: (r.name == null ? "" : String(r.name)),
+      amount: (r.amount == null || r.amount === "" ? 0 : Number(r.amount)),
+      unit: (r.unit == null ? "" : String(r.unit)),
+      cat: (r.cat == null ? "" : String(r.cat)),
+      ts: (typeof r.ts === "number" ? r.ts : (r.ts ? parseInt(r.ts, 10) : 0)),
+      __pb: 1
+    };
+  }
+  function invItem2body(it) {
+    return {
+      name: (it.name == null ? "" : String(it.name)),
+      amount: (it.amount == null || it.amount === "" ? 0 : Number(it.amount)),
+      unit: (it.unit == null ? "" : String(it.unit)),
+      cat: (it.cat == null ? "" : String(it.cat)),
+      ts: (typeof it.ts === "number" ? it.ts : Date.now())
+    };
+  }
+  // Pull the full stock list from the NAS and repaint (never while the add/edit form is open).
+  function invRefresh() {
+    if (MODE !== "nas" || invRefreshing) return Promise.resolve();
+    invRefreshing = true;
+    return jsonFetch(INV_RECORDS + "?perPage=1000&sort=cat,name", {}).then(function (data) {
+      invRefreshing = false;
+      var first = !invSyncReady;
+      invSyncReady = true;                     // collection exists → safe to sync writes
+      var items = (data && data.items) ? data.items : [];
+      if (first && items.length === 0 && inventory.length > 0) {
+        // collection just became available but is still empty → seed it from this
+        // device's local stock instead of wiping it to nothing.
+        inventory.forEach(function (it) { it.__pb = 0; invSyncItem(it); });
+        return;
+      }
+      if (invFormOpen) return;                 // don't clobber what the user is editing
+      inventory = items.map(invRec2item);
+      invSave();                               // local cache for instant paint next time
+      if ($("#invSection")) renderInventory();
+    }, function () { invRefreshing = false; });  // e.g. collection not created yet → stay local, no error
+  }
+  // Push one stock item to the server. New items are POSTed (adopting the server id);
+  // existing ones are PATCHed. Local-only until the server confirms.
+  function invSyncItem(it) {
+    if (MODE !== "nas" || !invSyncReady || !it) return;  // no NAS collection yet → local only
+    if (!it.__pb) {
+      if (it.__creating) return; it.__creating = 1;
+      jsonFetch(INV_RECORDS, { method: "POST", body: JSON.stringify(invItem2body(it)) }).then(function (rec) {
+        it.id = rec.id; it.__pb = 1; delete it.__creating; invSave();
+      }, function () { delete it.__creating; toast(saveFailMsg); });
+    } else {
+      jsonFetch(INV_RECORDS + "/" + encodeURIComponent(it.id), { method: "PATCH", body: JSON.stringify(invItem2body(it)) }).then(function () {}, function () {
+        jsonFetch(INV_RECORDS, { method: "POST", body: JSON.stringify(invItem2body(it)) }).then(function (rec) { it.id = rec.id; it.__pb = 1; invSave(); }, function () {});
+      });
+    }
+  }
+  function invSyncRemove(id) {
+    if (MODE !== "nas" || !invSyncReady || !id) return;
+    jsonFetch(INV_RECORDS + "/" + encodeURIComponent(id), { method: "DELETE" }).then(function () {}, function () {});
+  }
+
   function initServer() {
     showCloudStatus("connecting");
     entries = load(); rerenderAll();          // instant paint from cache
     jsonFetch(RECORDS + "?perPage=1", {}).then(function () {
       MODE = "nas"; showCloudStatus("nas");
-      refresh();
+      refresh(); invRefresh();
       if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(function () { if (document.visibilityState === "visible") refresh(); }, POLL_MS);
-      window.addEventListener("focus", function () { refresh(); });
-      document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") refresh(); });
+      pollTimer = setInterval(function () { if (document.visibilityState === "visible") { refresh(); invRefresh(); } }, POLL_MS);
+      window.addEventListener("focus", function () { refresh(); invRefresh(); });
+      document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") { refresh(); invRefresh(); } });
     }, function () {
       MODE = "local"; showCloudStatus("local");
       entries = load(); maybeSeed(); rerenderAll();
@@ -1508,6 +1578,7 @@
       toast("수정했어요");
     } else {
       createEntry(data);
+      invDeductForEntry(data);
       toast("기록했어요 🍼");
     }
     closeSheet();
@@ -1791,6 +1862,7 @@
               return { id: uid(), ts: Date.now() + k, date: chosen, name: it.name, amount: it.amount, unit: it.unit, react: "none", memo: it.snack ? ((label ? label + " " : "") + "간식") : label };
             });
             bulkAddEntries(es);
+            es.forEach(function (e) { invDeductForEntry(e); });
             planMarkAddedKey(myDay + "|" + label, chosen);
             toast(es.length + "개 기록에 담았어요 🍼");
             setTimeout(refreshPlanMarks, 1500);
@@ -1944,6 +2016,8 @@
       '<button type="button" class="btn sm inv-add" id="invAddBtn">+ 추가</button></div>';
     if (!collapsed) {
       html += '<div class="inv-body">';
+      html += '<label class="inv-opt"><input type="checkbox" id="invAuto"' + (invAutoOn() ? ' checked' : '') + '>' +
+        '<span><b>기록할 때 재고 자동 차감</b><br><span class="hint">같은 이름(소고기↔소고기), 이름이 포함되거나(고기↔소고기), 같은 분류에 재료가 하나면 그 재료에서 빠져요</span></span></label>';
       if (invFormOpen) html += invFormHtml();
       if (!n && !invFormOpen) {
         html += '<div class="inv-empty">아직 등록한 재고가 없어요.<br>‘+ 추가’로 쌀·고기·채소 재고를 적어 두세요.</div>';
@@ -1982,7 +2056,7 @@
     var next = Math.round((cur + delta) * 100) / 100;
     if (next < 0) next = 0;
     it.amount = next; it.ts = Date.now();
-    invSave(); renderInventory();
+    invSave(); invSyncItem(it); renderInventory();
   }
   function invFormSave() {
     var nameEl = $("#invName"); if (!nameEl) return;
@@ -1993,18 +2067,69 @@
     if (isNaN(amount) || amount < 0) amount = 0;
     var unit = ($("#invUnit").value || "").trim();
     var cat = invFormCat || invCatOf(name);
+    var saved;
     if (invFormId) {
       var it = inventory.find(function (x) { return x.id === invFormId; });
-      if (it) { it.name = name; it.amount = amount; it.unit = unit; it.cat = cat; it.ts = Date.now(); }
+      if (it) { it.name = name; it.amount = amount; it.unit = unit; it.cat = cat; it.ts = Date.now(); saved = it; }
     } else {
-      inventory.push({ id: "inv" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name, amount: amount, unit: unit, cat: cat, ts: Date.now() });
+      saved = { id: "inv" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: name, amount: amount, unit: unit, cat: cat, ts: Date.now() };
+      inventory.push(saved);
     }
-    invSave();
+    invSave(); if (saved) invSyncItem(saved);
     invFormOpen = false; invFormId = null; invFormCatManual = false;
     toast("저장했어요");
     renderInventory();
   }
+  // --- auto-deduct: subtract stock once, when a feeding is logged ---
+  // Deduction happens imperatively at create time (invDeductForEntry), so each
+  // feeding is counted exactly once by the device that logs it. That keeps the
+  // numbers consistent when stock syncs across devices. Editing/deleting a feeding
+  // does NOT auto-restore stock — adjust with the +/- buttons.
+  var INV_AUTO = "babyfood.invAutoDeduct.v1";  // "1" on (default) / "0" off (per device)
+  function invAutoOn() { try { return localStorage.getItem(INV_AUTO) !== "0"; } catch (e) { return true; } }
+  function invById(id) { return inventory.find(function (x) { return x.id === id; }); }
+  function invFindStock(e) {
+    var nm = (e.name || "").trim(); if (!nm || !inventory.length) return null;
+    var it = inventory.find(function (x) { return (x.name || "").trim() === nm; });
+    if (it) return it;                                   // 1) exact name
+    var cands = inventory.filter(function (x) { var s = (x.name || "").trim(); return s && nm.indexOf(s) >= 0; });
+    if (cands.length) { cands.sort(function (a, b) { return (b.name || "").length - (a.name || "").length; }); return cands[0]; } // 2) stock name inside entry name
+    var cat = invCatOf(nm);
+    var inCat = inventory.filter(function (x) { return (x.cat || invCatOf(x.name)) === cat; });
+    if (inCat.length === 1) return inCat[0];             // 3) only one stock item in that category
+    return null;
+  }
+  function invComputeDeduction(e) {
+    var it = invFindStock(e); if (!it) return null;
+    var n = Number(e.amount), amt;
+    if (e.amount === "" || e.amount == null || isNaN(n) || n <= 0) amt = 1;         // amount not recorded → 1 serving
+    else if (!it.unit || String(it.unit) === String(e.unit || "")) amt = n;        // same unit → logged amount
+    else amt = 1;                                                                  // different unit → 1 serving
+    return { itemId: it.id, amt: amt };
+  }
+  // Called once per newly logged feeding. Subtracts from the matched stock item,
+  // persists + syncs that one item, and shows a short confirmation.
+  function invDeductForEntry(e) {
+    if (!e || !invAutoOn()) return;
+    var d = invComputeDeduction(e); if (!d) return;
+    var it = invById(d.itemId); if (!it) return;
+    var cur = Number(it.amount) || 0;
+    var take = Math.min(cur, d.amt); if (take <= 0) { if (cur <= 0) toast("🧺 " + it.name + " 재고가 없어요"); return; }
+    it.amount = Math.round((cur - take) * 100) / 100;
+    it.ts = Date.now();
+    invSave(); invSyncItem(it);
+    toast("🧺 " + it.name + " 재고 −" + take + (it.unit || "") + " (남은 " + it.amount + (it.unit || "") + ")");
+    if ($("#invSection") && !invFormOpen) renderInventory();
+  }
+  function invSetAutoDeduct(on) {
+    try { localStorage.setItem(INV_AUTO, on ? "1" : "0"); } catch (e) {}
+    toast(on ? "이제 기록하면 재고가 자동으로 빠져요" : "자동 차감을 껐어요");
+  }
+  // invSyncItem / invSyncRemove are defined in the storage layer (NAS sync).
+
   function bindInventory(root) {
+    var auto = $("#invAuto", root);
+    if (auto) auto.addEventListener("change", function () { invSetAutoDeduct(auto.checked); });
     var head = $("#invHead", root);
     if (head) head.addEventListener("click", function (e) {
       if (e.target.closest("#invAddBtn")) return;
@@ -2049,7 +2174,7 @@
       $(".inv-del", row).addEventListener("click", function () {
         confirmDialog("‘" + it.name + "’ 재고를 삭제할까요?", function () {
           inventory = inventory.filter(function (x) { return x.id !== id; });
-          invSave(); toast("삭제했어요"); renderInventory();
+          invSave(); invSyncRemove(id); toast("삭제했어요"); renderInventory();
         });
       });
     });
@@ -2057,10 +2182,10 @@
 
   // ---- init ----
   initTheme();
-  renderInventory();
+  renderInventory();       // paint stock from the local cache first
   entries = load();        // instant paint from the local cache
   renderCalendar();
-  initServer();            // connect to the NAS (PocketBase) and poll for changes
+  initServer();            // connect to the NAS (PocketBase) and poll entries + inventory
 })();
 </script>
 
